@@ -57,7 +57,7 @@ dhcp-option=tag:proxy,6,192.168.31.122
 
 补全结果缓存 10 分钟，且不会覆盖 DHCP 已经上报的名称。SSDP 依赖组播，容器需要使用 `--network host`；bridge 模式仍可跑 DNS/NetBIOS/mDNS 的单播回退。
 
-小米后台里的 `Redmi-K50` 这类名字来自小米自己的 SQLite 设备库（`/data/etc/xqDb`），不属于通用协议；本工具不会读取厂商私有数据库。
+小米后台里的 `Redmi-K50` 这类名字来自小米自己的设备库；本工具可选地通过本地 `misystem/devicelist` 接口读取（需要小米后台密码），不直接解析私有 SQLite 文件。
 
 ## 快速开始
 
@@ -143,7 +143,8 @@ docker run -d \
 
 - 只监听 LAN，不要把端口暴露到公网
 - Web 使用单密码 + HttpOnly 会话 cookie
-- 路由器密码/私钥使用 AES-GCM 加密，密钥由 `ADMIN_PASSWORD` 派生
+- 路由器密码/私钥/小米后台密码使用 AES-GCM 加密，密钥由 `ADMIN_PASSWORD` 派生
+- 小米后台登录走本地 HTTP，发送 nonce 绑定的 SHA1 摘要，不发送明文；仍建议只在可信 LAN 使用
 - SSH 使用 `InsecureIgnoreHostKey`，适合可信 LAN；如需严格校验可自行扩展
 - 容器以 root 运行以写数据卷；如要降权，请自行调整卷权限
 
