@@ -25,6 +25,9 @@
   --btn-hover: rgba(255, 255, 255, 0.09);
   --tag-bg: rgba(255, 255, 255, 0.03);
   --seg-active: rgba(255, 255, 255, 0.09);
+  --scroll-thumb: rgba(148, 163, 184, 0.34);
+  --scroll-thumb-hover: rgba(148, 163, 184, 0.58);
+  --scroll-track: transparent;
   color-scheme: dark;
 }
 
@@ -54,6 +57,9 @@
   --btn-hover: rgba(30, 64, 110, 0.10);
   --tag-bg: rgba(30, 64, 110, 0.04);
   --seg-active: rgba(30, 64, 110, 0.10);
+  --scroll-thumb: rgba(71, 85, 105, 0.28);
+  --scroll-thumb-hover: rgba(71, 85, 105, 0.48);
+  --scroll-track: transparent;
   color-scheme: light;
 }
 
@@ -100,10 +106,17 @@ body {
   place-items: center;
   padding: 24px;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
-.login-wrap::-webkit-scrollbar { width: 0; height: 0; }
+.login-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+.login-wrap::-webkit-scrollbar-track { background: var(--scroll-track); }
+.login-wrap::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
 
 .login-card {
   width: min(420px, 100%);
@@ -267,10 +280,21 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 26px 28px 40px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
-.main::-webkit-scrollbar { width: 0; height: 0; }
+.main::-webkit-scrollbar { width: 8px; height: 8px; }
+.main::-webkit-scrollbar-track { background: var(--scroll-track); }
+.main::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.main::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
 
 /* ---------- stats ---------- */
 .stats {
@@ -575,11 +599,22 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   padding-right: 2px;
 }
-.dialog-body::-webkit-scrollbar { width: 0; height: 0; }
+.dialog-body::-webkit-scrollbar { width: 8px; height: 8px; }
+.dialog-body::-webkit-scrollbar-track { background: var(--scroll-track); }
+.dialog-body::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.dialog-body::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
 .dialog-head, .dialog-actions, .dialog .output { flex: 0 0 auto; }
 .dialog .output { margin: 8px 20px 16px; max-height: 110px; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
@@ -611,10 +646,17 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   white-space: pre-wrap;
   max-height: 150px;
   overflow: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
-.output::-webkit-scrollbar { width: 0; height: 0; }
+.output::-webkit-scrollbar { width: 8px; height: 8px; }
+.output::-webkit-scrollbar-track { background: var(--scroll-track); }
+.output::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
 
 /* ---------- toast ---------- */
 .toast {

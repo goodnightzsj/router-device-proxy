@@ -144,6 +144,15 @@ function renderStatus(s) {
   }
 }
 
+function renderHint() {
+  const gw = (state.config && state.config.proxy_gateway) || "";
+  const tail = gw
+    ? `直连设备不受 ${gw} 故障影响。`
+    : "直连设备不受代理网关故障影响。";
+  $("#footer-hint").textContent =
+    "离线设备不显示。切换后设备需要重连 Wi-Fi 或续租 DHCP 才会生效。" + tail;
+}
+
 function renderStats() {
   const total = state.devices.length;
   const onlineDevices = state.devices.filter((d) => d.online);
@@ -292,6 +301,7 @@ async function loadAll() {
   state.devices = dev.devices || [];
   state.config = cfg;
   renderStatus(status);
+  renderHint();
   renderAll();
   if (dev.error) showToast(dev.error, true);
 }
