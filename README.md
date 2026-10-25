@@ -52,12 +52,13 @@ dhcp-option=tag:proxy,6,192.168.31.122
 | mDNS | Apple / IoT / 打印机等的 `.local` 名称 |
 | LLMNR | Windows / systemd-resolved 本地名称 |
 | SSDP/UPnP | 电视、NAS、路由器的 `friendlyName` |
-| 小米设备库（可选） | 通过本地 `misystem/devicelist` 读取 Xiaomi 后台显示名，如 `Redmi-K50`；需填写小米后台密码 |
+| 小米本地设备库 | 只读解析 `/data/etc/xqDb` 的 `DEVICE_INFO`，自动获取 `Redmi-K50` 等显示名，不需要密码 |
+| 小米后台接口（可选） | 本地 `misystem/devicelist`，需要小米后台密码；作为 xqDb 的补充 |
 | OUI | 厂商名（已内置） |
 
 补全结果缓存 10 分钟，且不会覆盖 DHCP 已经上报的名称。SSDP 依赖组播，容器需要使用 `--network host`；bridge 模式仍可跑 DNS/NetBIOS/mDNS 的单播回退。
 
-小米后台里的 `Redmi-K50` 这类名字来自小米自己的设备库；本工具可选地通过本地 `misystem/devicelist` 接口读取（需要小米后台密码），不直接解析私有 SQLite 文件。
+小米后台里的 `Redmi-K50` 这类名字来自小米自己的设备库；本工具优先通过 SSH 只读解析 `/data/etc/xqDb`，不需要后台密码。`misystem/devicelist` 接口是可选的补充。
 
 ## 快速开始
 
@@ -106,7 +107,7 @@ docker run -d \
 | 代理网关 | 旁路由地址，例如 `192.168.31.122` |
 | DHCP leases 路径 | 默认 `/tmp/dhcp.leases`；不同固件可改 |
 | SSH 密码 / SSH 私钥 | 二选一；保存后加密存放在数据卷，不需要每次输入 |
-| 小米后台密码 | 可选；用于读取 Xiaomi 后台显示名（如 `Redmi-K50`），保存后加密存放 |
+| 小米后台密码 | 可选补充；名称优先从 `/data/etc/xqDb` 自动读取，不需要密码 |
 
 点 **测试连接** 验证 SSH，点 **安装开机持久化** 在路由器上写入 `/data/dnsmasq.d/restore.sh` 并挂到防火墙 include，重启后自动恢复。
 
@@ -121,7 +122,8 @@ docker run -d \
 | `ROUTER_USER` | `root` | SSH 用户 |
 | `ROUTER_PASSWORD` | 空 | SSH 密码（也可在设置页保存） |
 | `ROUTER_KEY` | 空 | SSH 私钥内容（也可在设置页保存） |
-| `ROUTER_WEB_PASSWORD` | 空 | 小米后台密码，用于读取 Xiaomi 设备显示名（也可在设置页保存） |
+| `ROUTER_WEB_PASSWORD` | 空 | 小米后台密码，可选；名称优先从 xqDb 自动读取 |
+| `XIAOMI_XQDB` | `/data/etc/xqDb` | 小米本地设备库路径；只读解析 |
 | `ROUTER_LEASE_FILE` | `/tmp/dhcp.leases` | dnsmasq 租约文件路径 |
 | `PROXY_GATEWAY` | `192.168.31.122` | 旁路由网关 |
 | `ROUTER_CONF_DIR` | `/data/dnsmasq.d` | 路由器持久配置目录 |
@@ -181,8 +183,12 @@ go build -trimpath -ldflags="-s -w" -o rdp .
 - 目前只处理 IPv4；IPv6 分流未实现
 - 开机持久化 hook 面向 OpenWrt/dnsmasq；其他系统需自行适配
 - 名称补全依赖设备是否响应 DNS/NetBIOS/mDNS/SSDP；小米私有设备名可通过可选的小米后台密码读取
-- 小米名称适配依赖本地后台登录接口，固件升级可能变化；未配置时回退到通用协议
+- 小米名称优先读本地 xqDb（只读）；后台接口是可选补充，固件升级可能变化
 - 品牌识别依赖 OUI 库，未知设备显示 `未知设备`
+
+## 架构
+
+多品牌兼容设计见 [docs/architecture-multi-brand.md](docs/architecture-multi-brand.md)。
 
 ## License
 

@@ -104,18 +104,19 @@ function renderStatus(s) {
 
 function renderStats() {
   const total = state.devices.length;
-  const online = state.devices.filter((d) => d.online).length;
-  const proxy = state.devices.filter((d) => d.mode === "proxy").length;
+  const onlineDevices = state.devices.filter((d) => d.online);
+  const proxy = onlineDevices.filter((d) => d.mode === "proxy").length;
   $("#stat-total").textContent = total;
-  $("#stat-online").textContent = online;
+  $("#stat-online").textContent = onlineDevices.length;
   $("#stat-proxy").textContent = proxy;
-  $("#stat-direct").textContent = total - proxy;
+  $("#stat-direct").textContent = onlineDevices.length - proxy;
 }
 
 function renderGrid() {
   const grid = $("#device-grid");
   const q = state.search.trim().toLowerCase();
   const list = state.devices.filter((d) => {
+    if (!d.online) return false;
     if (state.filter === "proxy" && d.mode !== "proxy") return false;
     if (state.filter === "direct" && d.mode !== "direct") return false;
     if (!q) return true;
@@ -246,6 +247,7 @@ async function openSettings() {
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
     $("#cfg-web-password").value = "";
+    $("#cfg-clear-web").checked = false;
     $("#cfg-web-password").placeholder = cfg.has_web_password
       ? "已保存，留空保持不变"
       : "用于读取 Xiaomi 设备名称";
@@ -317,6 +319,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
     password: $("#cfg-password").value,
     key: $("#cfg-key").value,
     web_password: $("#cfg-web-password").value,
+    clear_web_password: $("#cfg-clear-web").checked,
     proxy_gateway: $("#cfg-gateway").value.trim(),
     lease_file: $("#cfg-lease").value.trim(),
   };

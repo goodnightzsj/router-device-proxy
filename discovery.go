@@ -75,6 +75,7 @@ func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
 	if a.cfg.Mock {
 		return devices
 	}
+	devices = a.applyXqdbNames(ctx, devices)
 	if xc := a.xiaomiClient(); xc != nil && xc.configured() {
 		xctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		devices = a.applyXiaomiNames(xctx, devices, xc)

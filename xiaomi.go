@@ -105,6 +105,7 @@ func (x *xiaomiClient) fetchNames(ctx context.Context) (map[string]string, error
 	if err != nil {
 		x.failAt = time.Now()
 		x.failErr = err
+		log.Printf("xiaomi names: %v", err)
 		return nil, err
 	}
 	x.failErr = nil
@@ -232,7 +233,6 @@ func parseXiaomiDevices(r io.Reader) (map[string]string, error) {
 func (a *App) applyXiaomiNames(ctx context.Context, devices []Device, xc *xiaomiClient) []Device {
 	names, err := xc.fetchNames(ctx)
 	if err != nil {
-		log.Printf("xiaomi names: %v", err)
 		return devices
 	}
 	applied := 0

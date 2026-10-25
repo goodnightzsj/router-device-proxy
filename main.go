@@ -34,6 +34,7 @@ type Config struct {
 	RouterPassword    string
 	RouterKey         string
 	RouterWebPassword string
+	XqdbPath          string
 	ProxyGateway      string
 	LeaseFile         string
 	ConfDir           string
@@ -86,6 +87,7 @@ func loadConfig() Config {
 		RouterPassword:    os.Getenv("ROUTER_PASSWORD"),
 		RouterKey:         os.Getenv("ROUTER_KEY"),
 		RouterWebPassword: os.Getenv("ROUTER_WEB_PASSWORD"),
+		XqdbPath:          env("XIAOMI_XQDB", "/data/etc/xqDb"),
 		ProxyGateway:      env("PROXY_GATEWAY", "192.168.31.122"),
 		LeaseFile:         env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
 		ConfDir:           env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
@@ -115,6 +117,7 @@ type App struct {
 	store  *Store
 	names  *nameCache
 	xiaomi *xiaomiClient
+	xqdb   *xqdbCache
 	cfgMu  sync.Mutex
 	saved  SavedConfig
 }
@@ -220,7 +223,7 @@ func (a *App) loadSaved() error {
 	return nil
 }
 
-func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gateway, leaseFile string) error {
+func (a *App) saveSaved(host, user, authMethod, password, key, webPassword string, clearWeb bool, gateway, leaseFile string) error {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return err
@@ -252,8 +255,11 @@ func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gate
 			return err
 		}
 	}
-	if webPassword == "" {
+	if webPassword == "" && !clearWeb {
 		webPassword = a.cfg.RouterWebPassword
+	}
+	if clearWeb {
+		webPassword = ""
 	}
 	sc.RouterWebPasswordEnc, err = encryptString(webPassword, a.cfg.AdminPassword, salt)
 	if err != nil {
@@ -464,14 +470,15 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		RouterHost   string `json:"router_host"`
-		RouterUser   string `json:"router_user"`
-		AuthMethod   string `json:"auth_method"`
-		Password     string `json:"password"`
-		Key          string `json:"key"`
-		WebPassword  string `json:"web_password"`
-		ProxyGateway string `json:"proxy_gateway"`
-		LeaseFile    string `json:"lease_file"`
+		RouterHost       string `json:"router_host"`
+		RouterUser       string `json:"router_user"`
+		AuthMethod       string `json:"auth_method"`
+		Password         string `json:"password"`
+		Key              string `json:"key"`
+		WebPassword      string `json:"web_password"`
+		ClearWebPassword bool   `json:"clear_web_password"`
+		ProxyGateway     string `json:"proxy_gateway"`
+		LeaseFile        string `json:"lease_file"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -487,7 +494,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
-	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.WebPassword, body.ProxyGateway, body.LeaseFile); err != nil {
+	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.WebPassword, body.ClearWebPassword, body.ProxyGateway, body.LeaseFile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -522,6 +529,7 @@ func main() {
 	}
 	a := &App{cfg: cfg}
 	a.names = newNameCache()
+	a.xqdb = newXqdbCache()
 	if err := a.loadSaved(); err != nil {
 		log.Printf("load saved config: %v", err)
 	}

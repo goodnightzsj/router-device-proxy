@@ -88,6 +88,16 @@ body {
 
 .field { display: block; text-align: left; margin-bottom: 16px; }
 .field > span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.check input { width: auto; }
 input, textarea {
   width: 100%;
   border: 1px solid var(--line);
