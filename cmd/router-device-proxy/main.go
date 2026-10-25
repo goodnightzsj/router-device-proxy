@@ -216,6 +216,16 @@ func (a *App) auth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func secretPresence(settings []router.Setting, secrets map[string]string) map[string]bool {
+	out := make(map[string]bool)
+	for _, s := range settings {
+		if s.Secret {
+			out[s.Key] = secrets[s.Key] != ""
+		}
+	}
+	return out
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
@@ -336,18 +346,20 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"router_host":      a.cfg.RouterHost,
-		"router_user":      a.cfg.RouterUser,
-		"auth_method":      authMethod,
-		"has_password":     a.cfg.RouterPassword != "",
-		"has_key":          a.cfg.RouterKey != "",
-		"has_web_password": a.cfg.RouterWebPassword != "",
-		"proxy_gateway":    a.cfg.ProxyGateway,
-		"lease_file":       a.cfg.LeaseFile,
-		"conf_dir":         a.cfg.ConfDir,
-		"tmp_dir":          a.cfg.TmpDir,
-		"brand":            set.Brand,
-		"capabilities":     set.Capabilities(),
+		"router_host":   a.cfg.RouterHost,
+		"router_user":   a.cfg.RouterUser,
+		"auth_method":   authMethod,
+		"has_password":  a.cfg.RouterPassword != "",
+		"has_key":       a.cfg.RouterKey != "",
+		"settings":      set.Settings,
+		"options":       a.cfg.Options,
+		"has_secrets":   secretPresence(set.Settings, a.cfg.Secrets),
+		"proxy_gateway": a.cfg.ProxyGateway,
+		"lease_file":    a.cfg.LeaseFile,
+		"conf_dir":      a.cfg.ConfDir,
+		"tmp_dir":       a.cfg.TmpDir,
+		"brand":         set.Brand,
+		"capabilities":  set.Capabilities(),
 	})
 }
 
@@ -357,15 +369,16 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		RouterHost       string `json:"router_host"`
-		RouterUser       string `json:"router_user"`
-		AuthMethod       string `json:"auth_method"`
-		Password         string `json:"password"`
-		Key              string `json:"key"`
-		WebPassword      string `json:"web_password"`
-		ClearWebPassword bool   `json:"clear_web_password"`
-		ProxyGateway     string `json:"proxy_gateway"`
-		LeaseFile        string `json:"lease_file"`
+		RouterHost   string            `json:"router_host"`
+		RouterUser   string            `json:"router_user"`
+		AuthMethod   string            `json:"auth_method"`
+		Password     string            `json:"password"`
+		Key          string            `json:"key"`
+		Options      map[string]string `json:"options"`
+		Secrets      map[string]string `json:"secrets"`
+		ClearSecrets []string          `json:"clear_secrets"`
+		ProxyGateway string            `json:"proxy_gateway"`
+		LeaseFile    string            `json:"lease_file"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -382,21 +395,22 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
 	sc, newCfg, err := a.cfg.BuildSaved(config.Update{
-		RouterHost:       body.RouterHost,
-		RouterUser:       body.RouterUser,
-		AuthMethod:       body.AuthMethod,
-		Password:         body.Password,
-		Key:              body.Key,
-		WebPassword:      body.WebPassword,
-		ClearWebPassword: body.ClearWebPassword,
-		ProxyGateway:     body.ProxyGateway,
-		LeaseFile:        body.LeaseFile,
+		RouterHost:   body.RouterHost,
+		RouterUser:   body.RouterUser,
+		AuthMethod:   body.AuthMethod,
+		Password:     body.Password,
+		Key:          body.Key,
+		Options:      body.Options,
+		Secrets:      body.Secrets,
+		ClearSecrets: body.ClearSecrets,
+		ProxyGateway: body.ProxyGateway,
+		LeaseFile:    body.LeaseFile,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := config.Save(config.Path(a.cfg.DataDir), a.cfg.AdminPassword, sc); err != nil {
+	if err := config.Save(config.Path(a.cfg.DataDir), sc); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -442,7 +456,7 @@ func main() {
 	if err := os.MkdirAll(cfg.DataDir, 0700); err != nil {
 		log.Fatalf("data dir: %v", err)
 	}
-	sc, err := config.LoadSaved(config.Path(cfg.DataDir), cfg.AdminPassword)
+	sc, err := config.LoadSaved(config.Path(cfg.DataDir))
 	if err != nil {
 		log.Printf("load saved config: %v", err)
 	}

@@ -47,6 +47,15 @@ type Capabilities struct {
 	Persistence bool `json:"persistence"`
 }
 
+// Setting describes one brand-specific configuration field. Secret values are
+// never returned to the browser; only whether a value is already stored.
+type Setting struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Secret      bool   `json:"secret,omitempty"`
+}
+
 type Set struct {
 	Devices     DeviceSource
 	Names       []NameSource
@@ -55,6 +64,7 @@ type Set struct {
 	Health      Health
 	Brand       string
 	Caps        Capabilities
+	Settings    []Setting
 }
 
 func (s Set) Capabilities() Capabilities {

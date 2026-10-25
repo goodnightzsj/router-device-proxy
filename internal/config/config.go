@@ -15,49 +15,55 @@ import (
 )
 
 type Config struct {
-	Addr              string
-	DataDir           string
-	AdminPassword     string
-	Brand             string
-	RouterHost        string
-	RouterUser        string
-	RouterPassword    string
-	RouterKey         string
-	RouterWebPassword string
-	XqdbPath          string
-	ProxyGateway      string
-	LeaseFile         string
-	ConfDir           string
-	TmpDir            string
-	RestartCmd        string
-	Discovery         bool
-	DiscoverySSDP     bool
-	DiscoveryTimeout  time.Duration
-	Mock              bool
+	Addr             string
+	DataDir          string
+	AdminPassword    string
+	Brand            string
+	RouterHost       string
+	RouterUser       string
+	RouterPassword   string
+	RouterKey        string
+	Options          map[string]string
+	Secrets          map[string]string
+	ProxyGateway     string
+	LeaseFile        string
+	ConfDir          string
+	TmpDir           string
+	RestartCmd       string
+	Discovery        bool
+	DiscoverySSDP    bool
+	DiscoveryTimeout time.Duration
+	Mock             bool
 }
 
 type SavedConfig struct {
-	RouterHost           string `json:"router_host"`
-	RouterUser           string `json:"router_user"`
-	AuthMethod           string `json:"auth_method"`
-	RouterPasswordEnc    string `json:"router_password_enc,omitempty"`
-	RouterKeyEnc         string `json:"router_key_enc,omitempty"`
+	RouterHost        string            `json:"router_host"`
+	RouterUser        string            `json:"router_user"`
+	AuthMethod        string            `json:"auth_method"`
+	RouterPasswordEnc string            `json:"router_password_enc,omitempty"`
+	RouterKeyEnc      string            `json:"router_key_enc,omitempty"`
+	Options           map[string]string `json:"options,omitempty"`
+	SecretsEnc        string            `json:"secrets_enc,omitempty"`
+
+	// Legacy single-brand field, migrated into Secrets on load.
 	RouterWebPasswordEnc string `json:"router_web_password_enc,omitempty"`
-	ProxyGateway         string `json:"proxy_gateway"`
-	LeaseFile            string `json:"lease_file,omitempty"`
-	Salt                 string `json:"salt"`
+
+	ProxyGateway string `json:"proxy_gateway"`
+	LeaseFile    string `json:"lease_file,omitempty"`
+	Salt         string `json:"salt"`
 }
 
 type Update struct {
-	RouterHost       string
-	RouterUser       string
-	AuthMethod       string
-	Password         string
-	Key              string
-	WebPassword      string
-	ClearWebPassword bool
-	ProxyGateway     string
-	LeaseFile        string
+	RouterHost   string
+	RouterUser   string
+	AuthMethod   string
+	Password     string
+	Key          string
+	Options      map[string]string
+	Secrets      map[string]string
+	ClearSecrets []string
+	ProxyGateway string
+	LeaseFile    string
 }
 
 func env(k, def string) string {
@@ -93,30 +99,38 @@ func envDuration(k string, def time.Duration) time.Duration {
 
 func Load() Config {
 	return Config{
-		Addr:              env("ADDR", ":8090"),
-		DataDir:           env("DATA_DIR", "/data"),
-		AdminPassword:     os.Getenv("ADMIN_PASSWORD"),
-		Brand:             env("ROUTER_BRAND", "auto"),
-		RouterHost:        env("ROUTER_HOST", "192.168.31.1"),
-		RouterUser:        env("ROUTER_USER", "root"),
-		RouterPassword:    os.Getenv("ROUTER_PASSWORD"),
-		RouterKey:         os.Getenv("ROUTER_KEY"),
-		RouterWebPassword: os.Getenv("ROUTER_WEB_PASSWORD"),
-		XqdbPath:          env("XIAOMI_XQDB", "/data/etc/xqDb"),
-		ProxyGateway:      env("PROXY_GATEWAY", "192.168.31.122"),
-		LeaseFile:         env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
-		ConfDir:           env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
-		TmpDir:            env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
-		RestartCmd:        env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
-		Discovery:         envBool("DISCOVERY", true),
-		DiscoverySSDP:     envBool("DISCOVERY_SSDP", true),
-		DiscoveryTimeout:  envDuration("DISCOVERY_TIMEOUT", 2*time.Second),
-		Mock:              envBool("MOCK", false),
+		Addr:             env("ADDR", ":8090"),
+		DataDir:          env("DATA_DIR", "/data"),
+		AdminPassword:    os.Getenv("ADMIN_PASSWORD"),
+		Brand:            env("ROUTER_BRAND", "auto"),
+		RouterHost:       env("ROUTER_HOST", "192.168.31.1"),
+		RouterUser:       env("ROUTER_USER", "root"),
+		RouterPassword:   os.Getenv("ROUTER_PASSWORD"),
+		RouterKey:        os.Getenv("ROUTER_KEY"),
+		Options:          map[string]string{},
+		Secrets:          map[string]string{},
+		ProxyGateway:     env("PROXY_GATEWAY", "192.168.31.122"),
+		LeaseFile:        env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
+		ConfDir:          env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
+		TmpDir:           env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
+		RestartCmd:       env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
+		Discovery:        envBool("DISCOVERY", true),
+		DiscoverySSDP:    envBool("DISCOVERY_SSDP", true),
+		DiscoveryTimeout: envDuration("DISCOVERY_TIMEOUT", 2*time.Second),
+		Mock:             envBool("MOCK", false),
 	}
 }
 
 func Path(dataDir string) string {
 	return filepath.Join(dataDir, "config.json")
+}
+
+// Option returns a brand-agnostic option with a default.
+func (c Config) Option(key, def string) string {
+	if v := c.Options[key]; v != "" {
+		return v
+	}
+	return def
 }
 
 func deriveKey(password string, salt []byte) []byte {
@@ -173,7 +187,7 @@ func decryptString(enc, password string, salt []byte) (string, error) {
 	return string(plain), nil
 }
 
-func LoadSaved(path, admin string) (SavedConfig, error) {
+func LoadSaved(path string) (SavedConfig, error) {
 	var sc SavedConfig
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -216,9 +230,22 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 		cfg.RouterKey = v
 		cfg.RouterPassword = ""
 	}
-	if v, err := decryptString(sc.RouterWebPasswordEnc, admin, salt); err == nil && v != "" {
-		cfg.RouterWebPassword = v
+	cfg.Options = copyMap(sc.Options)
+	if cfg.Options["xiaomi_xqdb"] == "" {
+		cfg.Options["xiaomi_xqdb"] = "/data/etc/xqDb"
 	}
+	secrets := map[string]string{}
+	if sc.SecretsEnc != "" {
+		if plain, err := decryptString(sc.SecretsEnc, admin, salt); err == nil && plain != "" {
+			_ = json.Unmarshal([]byte(plain), &secrets)
+		}
+	}
+	if len(secrets) == 0 && sc.RouterWebPasswordEnc != "" {
+		if v, err := decryptString(sc.RouterWebPasswordEnc, admin, salt); err == nil && v != "" {
+			secrets["legacy_web_password"] = v // legacy migration; brand adapters map it
+		}
+	}
+	cfg.Secrets = secrets
 	return nil
 }
 
@@ -227,28 +254,48 @@ func (cfg Config) BuildSaved(u Update) (SavedConfig, Config, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return SavedConfig{}, cfg, err
 	}
-	password, key, web := u.Password, u.Key, u.WebPassword
+	password, key := u.Password, u.Key
 	if u.AuthMethod == "password" && password == "" {
 		password = cfg.RouterPassword
 	}
 	if u.AuthMethod == "key" && key == "" {
 		key = cfg.RouterKey
 	}
-	if web == "" && !u.ClearWebPassword {
-		web = cfg.RouterWebPassword
+
+	options := copyMap(cfg.Options)
+	for k, v := range u.Options {
+		if v != "" {
+			options[k] = v
+		}
 	}
-	if u.ClearWebPassword {
-		web = ""
+	secrets := copyMap(cfg.Secrets)
+	for k, v := range u.Secrets {
+		if v != "" {
+			secrets[k] = v
+		}
 	}
+	for _, k := range u.ClearSecrets {
+		delete(secrets, k)
+	}
+	raw, err := json.Marshal(secrets)
+	if err != nil {
+		return SavedConfig{}, cfg, err
+	}
+	secretsEnc, err := encryptString(string(raw), cfg.AdminPassword, salt)
+	if err != nil {
+		return SavedConfig{}, cfg, err
+	}
+
 	sc := SavedConfig{
 		RouterHost:   u.RouterHost,
 		RouterUser:   u.RouterUser,
 		AuthMethod:   u.AuthMethod,
+		Options:      options,
+		SecretsEnc:   secretsEnc,
 		ProxyGateway: u.ProxyGateway,
 		LeaseFile:    u.LeaseFile,
 		Salt:         base64.StdEncoding.EncodeToString(salt),
 	}
-	var err error
 	if u.AuthMethod == "password" {
 		sc.RouterPasswordEnc, err = encryptString(password, cfg.AdminPassword, salt)
 		if err != nil {
@@ -261,10 +308,7 @@ func (cfg Config) BuildSaved(u Update) (SavedConfig, Config, error) {
 			return sc, cfg, err
 		}
 	}
-	sc.RouterWebPasswordEnc, err = encryptString(web, cfg.AdminPassword, salt)
-	if err != nil {
-		return sc, cfg, err
-	}
+
 	cfg.RouterHost = u.RouterHost
 	cfg.RouterUser = u.RouterUser
 	cfg.ProxyGateway = u.ProxyGateway
@@ -278,11 +322,12 @@ func (cfg Config) BuildSaved(u Update) (SavedConfig, Config, error) {
 		cfg.RouterKey = key
 		cfg.RouterPassword = ""
 	}
-	cfg.RouterWebPassword = web
+	cfg.Options = options
+	cfg.Secrets = secrets
 	return sc, cfg, nil
 }
 
-func Save(path, admin string, sc SavedConfig) error {
+func Save(path string, sc SavedConfig) error {
 	b, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {
 		return err
@@ -295,4 +340,12 @@ func Save(path, admin string, sc SavedConfig) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func copyMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }

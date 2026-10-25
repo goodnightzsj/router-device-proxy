@@ -236,6 +236,37 @@ function currentAuthMethod() {
   return $(".auth-tabs button.active")?.dataset.auth || "password";
 }
 
+function renderBrandSettings(settings, hasSecrets, options) {
+  const box = $("#brand-settings");
+  box.innerHTML = settings.map((s) => {
+    const id = `brand-${s.key}`;
+    if (s.secret) {
+      const saved = hasSecrets[s.key] ? "已保存，留空保持不变" : (s.placeholder || "可选");
+      return `<label class="field"><span>${escapeHTML(s.label)}</span>
+        <input id="${id}" data-brand-secret="${escapeHTML(s.key)}" type="password" autocomplete="off" placeholder="${escapeHTML(saved)}"></label>
+        <label class="check"><input type="checkbox" data-clear-secret="${escapeHTML(s.key)}"> 清除已保存的${escapeHTML(s.label)}</label>`;
+    }
+    return `<label class="field"><span>${escapeHTML(s.label)}</span>
+      <input id="${id}" data-brand-option="${escapeHTML(s.key)}" value="${escapeHTML(options[s.key] || "")}" placeholder="${escapeHTML(s.placeholder || "")}"></label>`;
+  }).join("");
+}
+
+function collectBrandOptions() {
+  const out = {};
+  $$("[data-brand-option]").forEach((el) => { out[el.dataset.brandOption] = el.value.trim(); });
+  return out;
+}
+
+function collectBrandSecrets() {
+  const out = {};
+  $$("[data-brand-secret]").forEach((el) => { if (el.value) out[el.dataset.brandSecret] = el.value; });
+  return out;
+}
+
+function collectClearSecrets() {
+  return $$("[data-clear-secret]").filter((el) => el.checked).map((el) => el.dataset.clearSecret);
+}
+
 async function openSettings() {
   try {
     const cfg = await api("/api/config");
@@ -246,11 +277,7 @@ async function openSettings() {
     $("#cfg-lease").value = cfg.lease_file || "";
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
-    $("#cfg-web-password").value = "";
-    $("#cfg-clear-web").checked = false;
-    $("#cfg-web-password").placeholder = cfg.has_web_password
-      ? "已保存，留空保持不变"
-      : "用于读取 Xiaomi 设备名称";
+    renderBrandSettings(cfg.settings || [], cfg.has_secrets || {}, cfg.options || {});
     setAuthMethod(cfg.auth_method || "password");
     $("#settings-output").classList.add("hidden");
     $("#settings-dialog").showModal();
@@ -318,8 +345,9 @@ $("#settings-form").addEventListener("submit", async (e) => {
     auth_method: currentAuthMethod(),
     password: $("#cfg-password").value,
     key: $("#cfg-key").value,
-    web_password: $("#cfg-web-password").value,
-    clear_web_password: $("#cfg-clear-web").checked,
+    options: collectBrandOptions(),
+    secrets: collectBrandSecrets(),
+    clear_secrets: collectClearSecrets(),
     proxy_gateway: $("#cfg-gateway").value.trim(),
     lease_file: $("#cfg-lease").value.trim(),
   };

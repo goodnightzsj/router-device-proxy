@@ -31,19 +31,34 @@ func New(cfg config.Config) (router.Set, error) {
 		Brand:       "openwrt",
 		Caps:        router.Capabilities{Devices: true, Names: true, Policy: true, Persistence: true},
 	}
+	xiaomiSetting := router.Setting{
+		Key:         "xiaomi_web_password",
+		Label:       "小米后台密码（可选）",
+		Placeholder: "用于读取 Xiaomi 设备名称",
+		Secret:      true,
+	}
+	xiaomiPath := router.Setting{
+		Key:         "xiaomi_xqdb",
+		Label:       "小米设备库路径",
+		Placeholder: "/data/etc/xqDb",
+	}
 	switch cfg.Brand {
 	case "", "auto":
 		set.Brand = "auto"
-		if cfg.XqdbPath != "" {
-			set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: cfg.XqdbPath})
+		set.Settings = append(set.Settings, xiaomiSetting, xiaomiPath)
+		if path := cfg.Option("xiaomi_xqdb", "/data/etc/xqDb"); path != "" {
+			set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: path})
 		}
-		if cfg.RouterWebPassword != "" {
-			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: cfg.RouterWebPassword})
+		if pw := cfg.Secrets["xiaomi_web_password"]; pw != "" {
+			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: pw})
 		}
 	case "xiaomi":
-		set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: cfg.XqdbPath})
-		if cfg.RouterWebPassword != "" {
-			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: cfg.RouterWebPassword})
+		set.Settings = append(set.Settings, xiaomiSetting, xiaomiPath)
+		if path := cfg.Option("xiaomi_xqdb", "/data/etc/xqDb"); path != "" {
+			set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: path})
+		}
+		if pw := cfg.Secrets["xiaomi_web_password"]; pw != "" {
+			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: pw})
 		}
 		set.Brand = "xiaomi"
 	case "generic":
