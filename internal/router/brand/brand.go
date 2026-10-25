@@ -83,6 +83,9 @@ func xiaomiPassword(cfg config.Config) string {
 	if v := cfg.Secrets["xiaomi_web_password"]; v != "" {
 		return v
 	}
+	if v := cfg.Secrets["legacy_web_password"]; v != "" {
+		return v
+	}
 	return os.Getenv("ROUTER_WEB_PASSWORD")
 }
 

@@ -45,7 +45,8 @@ type SavedConfig struct {
 	Options           map[string]string `json:"options,omitempty"`
 	SecretsEnc        string            `json:"secrets_enc,omitempty"`
 
-	// Legacy single-brand field, migrated into Secrets on load.
+	// Legacy field from the pre-refactor single-brand config. Read once and
+	// migrated into SecretsEnc; never written by new code.
 	RouterWebPasswordEnc string `json:"router_web_password_enc,omitempty"`
 
 	ProxyGateway string `json:"proxy_gateway"`
@@ -237,9 +238,10 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 			_ = json.Unmarshal([]byte(plain), &secrets)
 		}
 	}
+	// One-time migration from the pre-refactor single-brand field.
 	if len(secrets) == 0 && sc.RouterWebPasswordEnc != "" {
 		if v, err := decryptString(sc.RouterWebPasswordEnc, admin, salt); err == nil && v != "" {
-			secrets["xiaomi_web_password"] = v // one-time migration from the legacy single-brand field
+			secrets["legacy_web_password"] = v
 		}
 	}
 	cfg.Secrets = secrets
