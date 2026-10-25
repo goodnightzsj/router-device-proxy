@@ -1,0 +1,17 @@
+services:
+  router-device-proxy:
+    image: ${DOCKERHUB_USERNAME:-local}/router-device-proxy:latest
+    build: .
+    container_name: router-device-proxy
+    restart: unless-stopped
+    ports:
+      - "192.168.31.122:8090:8090"
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ROUTER_HOST: ${ROUTER_HOST:-192.168.31.1}
+      ROUTER_USER: ${ROUTER_USER:-root}
+      PROXY_GATEWAY: ${PROXY_GATEWAY:-192.168.31.122}
+      DATA_DIR: /data
+      # MOCK: "1"
+    volumes:
+      - ./data:/data

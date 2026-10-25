@@ -1,0 +1,6 @@
+rdp
+data/
+.playwright-mcp/
+*.png
+!docs/screenshot.png
+.env

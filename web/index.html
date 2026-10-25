@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Router Device Proxy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="login" class="login-wrap">
+    <form class="login-card" id="login-form">
+      <div class="brand-mark">RDP</div>
+      <h1>Router Device Proxy</h1>
+      <p class="muted">按设备选择直连或透明代理</p>
+      <label class="field">
+        <span>管理密码</span>
+        <input id="login-password" type="password" autocomplete="current-password" placeholder="ADMIN_PASSWORD" required>
+      </label>
+      <button class="btn primary" type="submit">进入控制台</button>
+      <p class="error" id="login-error"></p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark small">RDP</span>
+        <div>
+          <h1>Router Device Proxy</h1>
+          <p class="muted" id="router-line">—</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill" id="router-status"><i></i><span>检查中</span></span>
+        <button class="icon-btn" id="refresh-btn" title="刷新设备">⟳</button>
+        <button class="icon-btn" id="settings-btn" title="设置">⚙</button>
+        <button class="icon-btn" id="logout-btn" title="退出">⎋</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="stats">
+        <div class="stat"><span class="stat-label">设备总数</span><strong id="stat-total">0</strong></div>
+        <div class="stat"><span class="stat-label">在线</span><strong id="stat-online">0</strong></div>
+        <div class="stat accent"><span class="stat-label">走代理</span><strong id="stat-proxy">0</strong></div>
+        <div class="stat"><span class="stat-label">直连</span><strong id="stat-direct">0</strong></div>
+      </section>
+
+      <section class="toolbar">
+        <div class="search"><span>⌕</span><input id="search" placeholder="搜索名称、品牌、MAC、IP"></div>
+        <div class="segmented" id="filter">
+          <button data-filter="all" class="active">全部</button>
+          <button data-filter="proxy">代理</button>
+          <button data-filter="direct">直连</button>
+        </div>
+        <button class="btn primary" id="apply-btn" disabled>应用更改 <span id="pending-count" class="badge hidden">0</span></button>
+      </section>
+
+      <section id="device-grid" class="grid"></section>
+      <p class="hint">切换后设备需要重连 Wi-Fi 或续租 DHCP 才会生效。直连设备不受 131.122 故障影响。</p>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <dialog id="settings-dialog" class="dialog">
+      <form id="settings-form">
+        <div class="dialog-head">
+          <h2>路由器连接</h2>
+          <button type="button" class="icon-btn" id="close-settings">×</button>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
+          <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
+          <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
+          <label class="field"><span>小米后台密码（可选）</span><input id="cfg-webpass" type="password" placeholder="用于读取设备列表"></label>
+        </div>
+        <div class="auth-tabs">
+          <button type="button" data-auth="password" class="active">SSH 密码</button>
+          <button type="button" data-auth="key">SSH 私钥</button>
+        </div>
+        <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
+        <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
+        <p class="hint">首次连接需要输入 SSH 密码或私钥；保存后会加密存放在数据卷，不需要每次输入。</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="test-btn">测试连接</button>
+          <button type="button" class="btn" id="hook-btn">安装开机持久化</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+        <pre id="settings-output" class="output hidden"></pre>
+      </form>
+    </dialog>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

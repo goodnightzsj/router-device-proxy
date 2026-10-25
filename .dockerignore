@@ -1,0 +1,12 @@
+.git
+.github
+.gitignore
+.playwright-mcp
+data
+docs
+rdp
+*.png
+!docs/screenshot.png
+README.md
+LICENSE
+docker-compose.yml
