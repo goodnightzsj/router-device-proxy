@@ -1,4 +1,5 @@
-:root {
+:root,
+:root[data-theme="dark"] {
   --bg: #070b16;
   --bg-2: #0b1220;
   --card: rgba(255, 255, 255, 0.045);
@@ -13,22 +14,64 @@
   --danger: #fb7185;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   --radius: 18px;
+  --input-bg: rgba(2, 6, 23, 0.55);
+  --panel: rgba(2, 6, 23, 0.5);
+  --panel-2: rgba(15, 23, 42, 0.92);
+  --glow-1: rgba(94, 234, 212, 0.12);
+  --glow-2: rgba(129, 140, 248, 0.16);
+  --glow-3: rgba(56, 189, 248, 0.08);
+  --icon-tile: rgba(255, 255, 255, 0.06);
+  --btn-bg: rgba(255, 255, 255, 0.04);
+  --btn-hover: rgba(255, 255, 255, 0.09);
+  --tag-bg: rgba(255, 255, 255, 0.03);
+  --seg-active: rgba(255, 255, 255, 0.09);
   color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f7fb;
+  --bg-2: #eaf0f7;
+  --card: rgba(255, 255, 255, 0.78);
+  --card-strong: rgba(255, 255, 255, 0.95);
+  --line: rgba(30, 64, 110, 0.13);
+  --text: #142033;
+  --muted: #5d6f86;
+  --accent: #0f9f8d;
+  --accent-2: #5b6cf0;
+  --ok: #128a5b;
+  --warn: #a86400;
+  --danger: #c9364f;
+  --shadow: 0 24px 60px rgba(31, 56, 92, 0.14);
+  --radius: 18px;
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-2: rgba(255, 255, 255, 0.97);
+  --glow-1: rgba(15, 159, 141, 0.10);
+  --glow-2: rgba(91, 108, 240, 0.10);
+  --glow-3: rgba(56, 150, 230, 0.08);
+  --icon-tile: rgba(30, 64, 110, 0.05);
+  --btn-bg: rgba(30, 64, 110, 0.05);
+  --btn-hover: rgba(30, 64, 110, 0.10);
+  --tag-bg: rgba(30, 64, 110, 0.04);
+  --seg-active: rgba(30, 64, 110, 0.10);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 
 html, body { height: 100%; }
+body { overflow: hidden; }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(900px 500px at 10% -10%, rgba(94, 234, 212, 0.12), transparent 60%),
-    radial-gradient(800px 500px at 95% 0%, rgba(129, 140, 248, 0.16), transparent 55%),
-    radial-gradient(700px 500px at 50% 110%, rgba(56, 189, 248, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 10% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(800px 500px at 95% 0%, var(--glow-2), transparent 55%),
+    radial-gradient(700px 500px at 50% 110%, var(--glow-3), transparent 60%),
     var(--bg);
+  transition: background-color 0.2s ease, color 0.2s ease;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
@@ -51,17 +94,22 @@ body {
 
 /* ---------- login ---------- */
 .login-wrap {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.login-wrap::-webkit-scrollbar { width: 0; height: 0; }
 
 .login-card {
   width: min(420px, 100%);
   padding: 36px 32px 28px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  background: linear-gradient(180deg, var(--card-strong), var(--card));
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
@@ -99,7 +147,7 @@ body {
 input, textarea {
   width: 100%;
   border: 1px solid var(--line);
-  background: rgba(2, 6, 23, 0.55);
+  background: var(--input-bg);
   color: var(--text);
   border-radius: 12px;
   padding: 12px 14px;
@@ -117,7 +165,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .btn {
   appearance: none;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--btn-bg);
   color: var(--text);
   border-radius: 12px;
   padding: 10px 16px;
@@ -127,7 +175,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   cursor: pointer;
   transition: transform 0.12s ease, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
 }
-.btn:hover { background: rgba(255, 255, 255, 0.09); }
+.btn:hover { background: var(--btn-hover); }
 .btn:active { transform: translateY(1px); }
 .btn.primary {
   color: #04121a;
@@ -151,18 +199,26 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .login-card .btn { width: 100%; padding: 13px 16px; margin-top: 6px; }
 
 /* ---------- app shell ---------- */
-.app { min-height: 100vh; }
+.app {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 
 .topbar {
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex: 0 0 auto;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   padding: 16px 28px;
-  background: rgba(7, 11, 22, 0.72);
+  background: var(--bg-2);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(16px);
 }
@@ -176,7 +232,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   height: 36px;
   border-radius: 11px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--btn-bg);
   color: var(--text);
   font-size: 16px;
   cursor: pointer;
@@ -184,7 +240,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   place-items: center;
   transition: background 0.18s ease, transform 0.12s ease;
 }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.09); }
+.icon-btn:hover { background: var(--btn-hover); }
 .icon-btn:active { transform: translateY(1px); }
 
 .status-pill {
@@ -194,7 +250,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--btn-bg);
   font-size: 12.5px;
   color: var(--muted);
 }
@@ -202,7 +258,19 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .status-pill.ok i { background: var(--ok); box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12); }
 .status-pill.bad i { background: var(--danger); box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.12); }
 
-.main { max-width: 1240px; margin: 0 auto; padding: 26px 28px 60px; }
+.main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 26px 28px 40px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.main::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ---------- stats ---------- */
 .stats {
@@ -238,7 +306,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 0 14px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(2, 6, 23, 0.5);
+  background: var(--panel);
 }
 .search span { color: var(--muted); font-size: 16px; }
 .search input { border: none; background: transparent; padding: 12px 0; box-shadow: none; }
@@ -249,7 +317,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 4px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(2, 6, 23, 0.5);
+  background: var(--panel);
 }
 .segmented button {
   border: none;
@@ -262,7 +330,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   cursor: pointer;
   transition: background 0.18s ease, color 0.18s ease;
 }
-.segmented button.active { background: rgba(255, 255, 255, 0.09); color: var(--text); }
+.segmented button.active { background: var(--seg-active); color: var(--text); }
 
 /* ---------- device grid ---------- */
 .grid {
@@ -275,7 +343,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 18px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(180deg, var(--card-strong), var(--card));
   backdrop-filter: blur(12px);
   transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -292,7 +360,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   display: grid;
   place-items: center;
   font-size: 21px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--icon-tile);
   border: 1px solid var(--line);
 }
 .device-icon svg { width: 22px; height: 22px; }
@@ -357,7 +425,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   font-size: 13px;
   line-height: 1;
 }
-.edit-note:hover { color: var(--text); border-color: var(--line); background: rgba(255, 255, 255, 0.06); }
+.edit-note:hover { color: var(--text); border-color: var(--line); background: var(--btn-hover); }
 .tag.gateway { color: #93c5fd; border-color: rgba(147, 197, 253, 0.3); background: rgba(147, 197, 253, 0.08); }
 .switch-locked {
   font-size: 10.5px;
@@ -416,7 +484,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tag-bg);
 }
 .tag.online { color: var(--ok); border-color: rgba(52, 211, 153, 0.25); background: rgba(52, 211, 153, 0.08); }
 .tag.offline { color: var(--muted); }
@@ -429,7 +497,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .device-meta code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11.5px;
-  color: #cbd5e1;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -480,33 +548,41 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 /* ---------- dialog ---------- */
 .dialog {
   width: min(680px, calc(100vw - 32px));
-  max-height: min(86vh, 760px);
+  max-height: min(90vh, 760px);
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 0;
   color: var(--text);
-  background: linear-gradient(180deg, #111a2d, #0b1220);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg));
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 .dialog::backdrop { background: rgba(2, 6, 23, 0.68); backdrop-filter: blur(6px); }
+.dialog[open] { display: flex; flex-direction: column; }
 .dialog form {
-  padding: 18px 22px 20px;
-  max-height: inherit;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.dialog-head { padding: 16px 20px 0; }
+.dialog-actions { padding: 10px 20px 16px; }
+.dialog-body { padding: 12px 20px 0; }
+.dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-right: 2px;
 }
-.dialog form::-webkit-scrollbar { width: 8px; }
-.dialog form::-webkit-scrollbar-track { background: transparent; }
-.dialog form::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.28);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-.dialog form::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); background-clip: padding-box; }
-.dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.dialog-body::-webkit-scrollbar { width: 0; height: 0; }
+.dialog-head, .dialog-actions, .dialog .output { flex: 0 0 auto; }
+.dialog .output { margin: 8px 20px 16px; max-height: 110px; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
 .dialog-head h2 { margin: 0; font-size: 17px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .form-grid.three { grid-template-columns: 1.4fr 1fr 1fr; }
@@ -518,24 +594,27 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 #brand-settings .check { margin: -6px 0 12px; }
 .auth-tabs { display: inline-flex; padding: 4px; border-radius: 11px; border: 1px solid var(--line); background: rgba(2, 6, 23, 0.5); margin: 2px 0 10px; }
 .auth-tabs button { border: none; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
-.auth-tabs button.active { background: rgba(255, 255, 255, 0.09); color: var(--text); }
-.dialog-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 14px; }
+.auth-tabs button.active { background: var(--seg-active); color: var(--text); }
+.dialog-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 0; }
 .note-dialog { width: min(420px, calc(100vw - 32px)); }
 .note-dialog form { max-height: none; }
 .note-dialog .hint { margin-top: 0; }
 .output {
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(2, 6, 23, 0.6);
-  color: #cbd5e1;
+  background: var(--panel);
+  color: var(--text);
   font-size: 11.5px;
   line-height: 1.5;
   white-space: pre-wrap;
-  max-height: 180px;
+  max-height: 150px;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.output::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ---------- toast ---------- */
 .toast {
@@ -548,7 +627,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   padding: 11px 18px;
   border-radius: 12px;
   border: 1px solid var(--line);
-  background: rgba(15, 23, 42, 0.92);
+  background: var(--panel-2);
   color: var(--text);
   font-size: 13px;
   box-shadow: var(--shadow);
@@ -566,7 +645,8 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   .stat strong { font-size: 24px; }
   .form-grid, .form-grid.three, .settings-grid { grid-template-columns: 1fr; }
   .dialog { max-height: 92vh; }
-  .dialog form { padding: 18px 16px 20px; }
+  .dialog form { padding: 16px 14px 18px; }
+  .dialog-body { padding-right: 0; }
   .toolbar { align-items: stretch; }
   .segmented { align-self: flex-start; }
   .device-meta { grid-template-columns: 1fr; }

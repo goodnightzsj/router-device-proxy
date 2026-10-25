@@ -3,9 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <title>Router Device Proxy</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <script>
+    (function () {
+      var pref = "auto";
+      try { pref = localStorage.getItem("rdp-theme") || "auto"; } catch (_) {}
+      var h = new Date().getHours();
+      var resolved = pref === "auto" ? (h >= 7 && h < 19 ? "light" : "dark") : pref;
+      if (resolved !== "light" && resolved !== "dark") resolved = "dark";
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.dataset.themePref = pref;
+      document.documentElement.style.colorScheme = resolved;
+    })();
+  </script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -39,6 +51,7 @@
       </div>
       <div class="top-actions">
         <span class="status-pill" id="router-status"><i></i><span>检查中</span></span>
+        <button class="icon-btn" id="theme-btn" title="主题：跟随时间" aria-label="切换主题"></button>
         <button class="icon-btn" id="refresh-btn" title="刷新设备">⟳</button>
         <button class="icon-btn" id="settings-btn" title="设置">⚙</button>
         <button class="icon-btn" id="logout-btn" title="退出">⎋</button>
@@ -75,21 +88,23 @@
           <h2>路由器连接</h2>
           <button type="button" class="icon-btn" id="close-settings">×</button>
         </div>
-        <div class="form-grid three">
-          <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
-          <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
-          <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
+        <div class="dialog-body">
+          <div class="form-grid three">
+            <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
+            <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
+            <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
+          </div>
+          <div class="auth-tabs">
+            <button type="button" data-auth="password" class="active">SSH 密码</button>
+            <button type="button" data-auth="key">SSH 私钥</button>
+          </div>
+          <div class="settings-grid">
+            <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
+            <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
+            <div id="brand-settings"></div>
+          </div>
+          <p class="hint">SSH 凭据加密保存在数据卷；品牌设置由当前适配器提供。</p>
         </div>
-        <div class="auth-tabs">
-          <button type="button" data-auth="password" class="active">SSH 密码</button>
-          <button type="button" data-auth="key">SSH 私钥</button>
-        </div>
-        <div class="settings-grid">
-          <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
-          <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
-          <div id="brand-settings"></div>
-        </div>
-        <p class="hint">SSH 凭据加密保存在数据卷；品牌设置由当前适配器提供。</p>
         <div class="dialog-actions">
           <button type="button" class="btn" id="test-btn">测试连接</button>
           <button type="button" class="btn" id="hook-btn">安装开机持久化</button>

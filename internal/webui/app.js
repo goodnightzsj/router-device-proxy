@@ -1,6 +1,13 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+const THEME_KEY = "rdp-theme";
+const THEME_ICONS = {
+  auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></svg>',
+  light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/></svg>',
+};
+
 const state = {
   devices: [],
   filter: "all",
@@ -70,6 +77,39 @@ function showApp() {
   $("#boot").classList.add("hidden");
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
+}
+
+function preferredTheme() {
+  try { return localStorage.getItem(THEME_KEY) || "auto"; } catch (_) { return "auto"; }
+}
+
+function resolvedTheme(pref) {
+  if (pref === "light" || pref === "dark") return pref;
+  const h = new Date().getHours();
+  return h >= 7 && h < 19 ? "light" : "dark";
+}
+
+function applyTheme(pref, persist) {
+  const resolved = resolvedTheme(pref);
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.themePref = pref;
+  document.documentElement.style.colorScheme = resolved;
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, pref); } catch (_) {}
+  }
+  const btn = $("#theme-btn");
+  if (btn) {
+    btn.innerHTML = THEME_ICONS[pref] || THEME_ICONS.auto;
+    btn.title = pref === "auto" ? "主题：跟随时间" : pref === "light" ? "主题：浅色" : "主题：深色";
+  }
+}
+
+// auto -> opposite of the time-based theme -> the other explicit theme -> auto.
+// This guarantees the first click always changes the visible theme.
+function nextTheme(pref) {
+  if (pref === "auto") return resolvedTheme("auto") === "light" ? "dark" : "light";
+  if (pref === "dark") return "light";
+  return "auto";
 }
 
 function showToast(msg, isError = false) {
@@ -375,6 +415,12 @@ $("#refresh-btn").addEventListener("click", async () => {
   }
 });
 
+$("#theme-btn").addEventListener("click", () => {
+  const next = nextTheme(preferredTheme());
+  applyTheme(next, true);
+  showToast(next === "auto" ? "主题：跟随时间" : next === "light" ? "主题：浅色" : "主题：深色");
+});
+
 $("#settings-btn").addEventListener("click", openSettings);
 $("#close-settings").addEventListener("click", () => $("#settings-dialog").close());
 $("#apply-btn").addEventListener("click", applyChanges);
@@ -451,6 +497,11 @@ $("#hook-btn").addEventListener("click", async () => {
     showToast(err.message, true);
   }
 });
+
+applyTheme(preferredTheme(), false);
+setInterval(() => {
+  if (preferredTheme() === "auto") applyTheme("auto", false);
+}, 60 * 1000);
 
 (async function init() {
   try {
