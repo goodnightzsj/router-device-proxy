@@ -362,6 +362,11 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			authMethod = "password"
 		}
 	}
+	options := make(map[string]string, len(a.cfg.Options)+1)
+	for k, v := range a.cfg.Options {
+		options[k] = v
+	}
+	options["lease_file"] = a.cfg.LeaseFile
 	writeJSON(w, http.StatusOK, map[string]any{
 		"router_host":   a.cfg.RouterHost,
 		"router_user":   a.cfg.RouterUser,
@@ -369,7 +374,7 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"has_password":  a.cfg.RouterPassword != "",
 		"has_key":       a.cfg.RouterKey != "",
 		"settings":      set.Settings,
-		"options":       a.cfg.Options,
+		"options":       options,
 		"has_secrets":   secretPresence(set.Settings, a.cfg.Secrets),
 		"proxy_gateway": a.cfg.ProxyGateway,
 		"lease_file":    a.cfg.LeaseFile,
