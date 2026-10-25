@@ -1,81 +1,13 @@
-package main
+package xiaomi
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
+
+	"github.com/goodnightzsj/router-device-proxy/internal/device"
 )
-
-// xqdb is a read-only view of Xiaomi's /data/etc/xqDb SQLite database.
-// It only reads DEVICE_INFO(MAC, ONAME, NICKNAME, ...) and never writes.
-type xqdbCache struct {
-	mu      sync.Mutex
-	names   map[string]string
-	at      time.Time
-	failAt  time.Time
-	failErr error
-}
-
-func newXqdbCache() *xqdbCache {
-	return &xqdbCache{}
-}
-
-func (a *App) xqdbNames(ctx context.Context) (map[string]string, error) {
-	if a.cfg.XqdbPath == "" || a.cfg.Mock || a.xqdb == nil {
-		return nil, fmt.Errorf("xqdb disabled")
-	}
-	c := a.xqdb
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.names != nil && time.Since(c.at) < 5*time.Minute {
-		return c.names, nil
-	}
-	if c.failErr != nil && time.Since(c.failAt) < 5*time.Minute {
-		return nil, c.failErr
-	}
-	out, err := a.sshRun("cat " + shellQuote(a.cfg.XqdbPath))
-	if err == nil {
-		var names map[string]string
-		names, err = readXqdbNames([]byte(out))
-		if err == nil {
-			c.names = names
-			c.at = time.Now()
-			c.failErr = nil
-			return names, nil
-		}
-	}
-	c.failAt = time.Now()
-	c.failErr = err
-	return nil, err
-}
-
-func (a *App) applyXqdbNames(ctx context.Context, devices []Device) []Device {
-	names, err := a.xqdbNames(ctx)
-	if err != nil {
-		return devices
-	}
-	applied := 0
-	for i := range devices {
-		name, ok := names[normalizeMAC(devices[i].MAC)]
-		if !ok {
-			continue
-		}
-		devices[i].Name = name
-		if t := inferType(name, devices[i].Brand); t != "unknown" {
-			devices[i].Type = t
-		}
-		applied++
-	}
-	if applied > 0 {
-		log.Printf("xqdb names: %d/%d devices", applied, len(devices))
-	}
-	return devices
-}
 
 // readXqdbNames parses the minimal SQLite subset used by xqDb. It is
 // deliberately read-only and only supports table B-trees with local payloads,
@@ -98,17 +30,17 @@ func readXqdbNames(data []byte) (map[string]string, error) {
 		if len(row) < 2 {
 			continue
 		}
-		mac := normalizeMAC(row[0])
+		mac := device.NormalizeMAC(row[0])
 		if mac == "" {
 			continue
 		}
 		name := strings.TrimSpace(row[1]) // ONAME
-		if isGenericName(name) && len(row) > 2 {
-			if n := strings.TrimSpace(row[2]); !isGenericName(n) {
+		if device.IsGenericName(name) && len(row) > 2 {
+			if n := strings.TrimSpace(row[2]); !device.IsGenericName(n) {
 				name = n
 			}
 		}
-		if name == "" || isGenericName(name) {
+		if name == "" || device.IsGenericName(name) {
 			continue
 		}
 		names[mac] = name

@@ -1,4 +1,4 @@
-package main
+package discovery
 
 import (
 	"context"
@@ -6,18 +6,19 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	hdns "github.com/marcuoli/go-hostdiscovery/pkg/hostdiscovery/dns"
 	hllmnr "github.com/marcuoli/go-hostdiscovery/pkg/hostdiscovery/llmnr"
 	hmdns "github.com/marcuoli/go-hostdiscovery/pkg/hostdiscovery/mdns"
 	hnetbios "github.com/marcuoli/go-hostdiscovery/pkg/hostdiscovery/netbios"
 	hssdp "github.com/marcuoli/go-hostdiscovery/pkg/hostdiscovery/ssdp"
+
+	"github.com/goodnightzsj/router-device-proxy/internal/device"
 )
 
 const nameCacheTTL = 10 * time.Minute
 
-type nameHit struct {
+type Hit struct {
 	Name     string
 	Type     string
 	Source   string
@@ -25,30 +26,28 @@ type nameHit struct {
 	At       time.Time
 }
 
-type nameCache struct {
+type Cache struct {
 	mu      sync.Mutex
-	entries map[string]nameHit
+	entries map[string]Hit
 }
 
-func newNameCache() *nameCache {
-	return &nameCache{entries: make(map[string]nameHit)}
-}
+func NewCache() *Cache { return &Cache{entries: make(map[string]Hit)} }
 
-func (c *nameCache) get(ip string) (nameHit, bool) {
+func (c *Cache) Get(ip string) (Hit, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	h, ok := c.entries[ip]
 	if !ok {
-		return nameHit{}, false
+		return Hit{}, false
 	}
 	if time.Since(h.At) > nameCacheTTL {
 		delete(c.entries, ip)
-		return nameHit{}, false
+		return Hit{}, false
 	}
 	return h, true
 }
 
-func (c *nameCache) put(ip string, h nameHit) {
+func (c *Cache) Put(ip string, h Hit) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if old, ok := c.entries[ip]; ok && time.Since(old.At) <= nameCacheTTL {
@@ -69,63 +68,61 @@ func (c *nameCache) put(ip string, h nameHit) {
 	c.entries[ip] = h
 }
 
-// enrichDevices adds names found by DNS/NetBIOS/mDNS/LLMNR/SSDP for devices
-// whose DHCP lease or ARP entry has no hostname. A DHCP name always wins.
-func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
-	if a.cfg.Mock {
-		return devices
-	}
-	devices = a.applyXqdbNames(ctx, devices)
-	if xc := a.xiaomiClient(); xc != nil && xc.configured() {
-		xctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		devices = a.applyXiaomiNames(xctx, devices, xc)
-		cancel()
-	}
-	if !a.cfg.Discovery || a.names == nil {
-		return devices
-	}
+type Options struct {
+	SSDP    bool
+	Timeout time.Duration
+}
 
-	need := make(map[string]bool)
-	ips := make([]string, 0, len(devices))
-	for _, d := range devices {
-		if d.IP == "" {
-			continue
-		}
-		if d.Name != "" && d.Name != d.MAC && d.Type != "unknown" {
-			continue
-		}
-		if _, ok := a.names.get(d.IP); ok {
-			continue
-		}
-		if !need[d.IP] {
-			need[d.IP] = true
-			ips = append(ips, d.IP)
-		}
-	}
+type Result struct {
+	Names map[string]string
+	Types map[string]string
+	Hits  map[string]int
+}
+
+// Resolve probes only the supplied IPs with DNS, NetBIOS, mDNS, LLMNR and
+// optionally SSDP. It never scans the whole subnet.
+func Resolve(ctx context.Context, ips []string, opts Options) Result {
+	out := Result{Names: map[string]string{}, Types: map[string]string{}, Hits: map[string]int{}}
 	if len(ips) == 0 {
-		return a.applyNames(devices)
+		return out
 	}
-
-	timeout := a.cfg.DiscoveryTimeout
+	timeout := opts.Timeout
 	if timeout <= 0 {
 		timeout = 2 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*timeout+2*time.Second)
 	defer cancel()
 
+	need := make(map[string]bool, len(ips))
+	for _, ip := range ips {
+		need[ip] = true
+	}
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	hits := map[string]int{}
-
+	type best struct {
+		name     string
+		typ      string
+		priority int
+	}
+	bestByIP := make(map[string]best, len(ips))
 	record := func(source string, priority int, ip, name, typ string) {
-		name = cleanHostname(name, ip)
+		name = device.CleanHostname(name, ip)
 		if name == "" && typ == "" {
 			return
 		}
 		mu.Lock()
-		hits[source]++
+		out.Hits[source]++
+		b := bestByIP[ip]
+		if name != "" && (b.name == "" || priority > b.priority) {
+			b.name = name
+			b.priority = priority
+		}
+		if typ != "" && b.typ == "" {
+			b.typ = typ
+		}
+		bestByIP[ip] = b
 		mu.Unlock()
-		a.names.put(ip, nameHit{Name: name, Type: typ, Source: source, Priority: priority, At: time.Now()})
 	}
 
 	lookup := func(source string, priority int, fn func(context.Context) map[string]string) {
@@ -141,52 +138,49 @@ func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
 	lookup("dns", 4, func(ctx context.Context) map[string]string {
 		d := hdns.NewDiscovery()
 		d.Timeout = timeout
-		out := make(map[string]string)
+		m := make(map[string]string)
 		for _, r := range d.LookupMultiple(ctx, ips) {
 			if r != nil && r.Hostname != "" {
-				out[r.IP] = r.Hostname
+				m[r.IP] = r.Hostname
 			}
 		}
-		return out
+		return m
 	})
-
 	lookup("netbios", 3, func(ctx context.Context) map[string]string {
 		d := hnetbios.NewDiscovery()
 		d.Timeout = timeout
-		out := make(map[string]string)
+		m := make(map[string]string)
 		for _, r := range d.LookupMultiple(ctx, ips) {
 			if r != nil && r.Hostname != "" {
-				out[r.IP] = r.Hostname
+				m[r.IP] = r.Hostname
 			}
 		}
-		return out
+		return m
 	})
-
 	lookup("mdns", 2, func(ctx context.Context) map[string]string {
 		d := hmdns.NewDiscovery()
 		d.Timeout = timeout
-		out := make(map[string]string)
+		m := make(map[string]string)
 		for _, r := range d.LookupMultiple(ctx, ips) {
 			if r != nil && r.Hostname != "" {
-				out[r.IP] = r.Hostname
+				m[r.IP] = r.Hostname
 			}
 		}
-		return out
+		return m
 	})
-
 	lookup("llmnr", 1, func(ctx context.Context) map[string]string {
 		d := hllmnr.NewDiscovery()
 		d.Timeout = timeout
-		out := make(map[string]string)
+		m := make(map[string]string)
 		for _, r := range d.LookupMultiple(ctx, ips) {
 			if r != nil && r.Hostname != "" {
-				out[r.IP] = r.Hostname
+				m[r.IP] = r.Hostname
 			}
 		}
-		return out
+		return m
 	})
 
-	if a.cfg.DiscoverySSDP {
+	if opts.SSDP {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -211,74 +205,18 @@ func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
 			}
 		}()
 	}
-
 	wg.Wait()
-
-	// Negative-cache devices that no protocol could name, so a page refresh
-	// does not probe the same silent devices again.
-	for _, ip := range ips {
-		if _, ok := a.names.get(ip); !ok {
-			a.names.put(ip, nameHit{At: time.Now()})
+	for ip, b := range bestByIP {
+		if b.name != "" {
+			out.Names[ip] = b.name
+		}
+		if b.typ != "" {
+			out.Types[ip] = b.typ
 		}
 	}
-
 	log.Printf("discovery: candidates=%d dns=%d netbios=%d mdns=%d llmnr=%d ssdp=%d",
-		len(ips), hits["dns"], hits["netbios"], hits["mdns"], hits["llmnr"], hits["ssdp"])
-
-	return a.applyNames(devices)
-}
-
-func (a *App) applyNames(devices []Device) []Device {
-	for i := range devices {
-		if devices[i].IP == "" {
-			continue
-		}
-		hit, ok := a.names.get(devices[i].IP)
-		if !ok {
-			continue
-		}
-		if devices[i].Name == "" || devices[i].Name == devices[i].MAC {
-			if hit.Name != "" {
-				devices[i].Name = hit.Name
-			}
-		}
-		if devices[i].Type == "unknown" {
-			if t := inferType(devices[i].Name, devices[i].Brand); t != "unknown" {
-				devices[i].Type = t
-			} else if hit.Type != "" {
-				devices[i].Type = hit.Type
-			}
-		}
-	}
-	return devices
-}
-
-// cleanHostname normalises network-supplied names and rejects values that
-// are not useful to display.
-func cleanHostname(name, ip string) string {
-	name = strings.TrimSpace(name)
-	name = strings.TrimSuffix(name, ".")
-	if len(name) >= 6 && strings.EqualFold(name[len(name)-6:], ".local") {
-		name = name[:len(name)-6]
-	}
-	name = strings.Map(func(r rune) rune {
-		if r < 32 || r == 127 {
-			return -1
-		}
-		return r
-	}, name)
-	name = strings.TrimSpace(name)
-	if name == "" || name == ip {
-		return ""
-	}
-	low := strings.ToLower(name)
-	if low == "localhost" || strings.HasSuffix(low, ".in-addr.arpa") || strings.HasPrefix(low, "0.0.0.0") {
-		return ""
-	}
-	if utf8.RuneCountInString(name) > 64 {
-		name = string([]rune(name)[:64])
-	}
-	return name
+		len(ips), out.Hits["dns"], out.Hits["netbios"], out.Hits["mdns"], out.Hits["llmnr"], out.Hits["ssdp"])
+	return out
 }
 
 func ssdpType(st string) string {
