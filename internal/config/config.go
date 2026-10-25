@@ -110,7 +110,7 @@ func Load() Config {
 		RouterKey:        os.Getenv("ROUTER_KEY"),
 		Options:          map[string]string{},
 		Secrets:          map[string]string{},
-		ProxyGateway:     env("PROXY_GATEWAY", "192.168.31.122"),
+		ProxyGateway:     env("PROXY_GATEWAY", ""),
 		LeaseFile:        env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
 		ConfDir:          env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
 		TmpDir:           env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),

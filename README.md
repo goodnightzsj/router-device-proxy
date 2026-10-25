@@ -36,8 +36,8 @@
 
 ```conf
 dhcp-host=AA:BB:CC:DD:EE:FF,set:proxy,192.168.31.50
-dhcp-option=tag:proxy,3,192.168.31.122
-dhcp-option=tag:proxy,6,192.168.31.122
+dhcp-option=tag:proxy,3,192.168.31.xx   # 旁路由 LAN IP
+dhcp-option=tag:proxy,6,192.168.31.xx   # 旁路由 LAN IP
 ```
 
 未标记设备继续使用主路由下发的网关/DNS，直连不受旁路由影响。
@@ -77,14 +77,14 @@ docker run -d \
   --name router-device-proxy \
   --restart always \
   --network host \
-  -e ADDR=192.168.31.122:18099 \
+  -e ADDR=192.168.31.xx:18099 \
   -e TZ=Asia/Shanghai \
   -e ADMIN_PASSWORD="$(cat /path/to/admin-password.txt)" \
   -e ROUTER_HOST=192.168.31.1 \
   -e ROUTER_USER=root \
   -e ROUTER_PASSWORD='你的路由器 SSH 密码' \
   -e ROUTER_WEB_PASSWORD='你的小米后台密码' \
-  -e PROXY_GATEWAY=192.168.31.122 \
+  -e PROXY_GATEWAY=192.168.31.xx \
   -e ROUTER_LEASE_FILE=/tmp/dhcp.leases \
   -v /path/to/data:/data \
   <DOCKERHUB_USERNAME>/router-device-proxy:latest
@@ -92,7 +92,7 @@ docker run -d \
 
 `ROUTER_WEB_PASSWORD` 也可以留空，之后在设置页填写；它只用于读取 Xiaomi 设备显示名。
 
-`--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 建议绑定旁路由 LAN IP（例如 `192.168.31.122:18099`），18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
+`--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 建议绑定旁路由 LAN IP（例如 `192.168.31.xx:18099`），18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
 
 如果只能用 bridge 网络，把 `--network host` 换成 `-p 18099:8090` 并去掉 `ADDR`；DNS/NetBIOS/mDNS 仍可用，SSDP 不会工作。
 
@@ -104,7 +104,7 @@ docker run -d \
 |---|---|
 | 路由器 IP | 主路由地址，例如 `192.168.31.1` |
 | SSH 用户 | 通常是 `root` |
-| 代理网关 | 旁路由地址，例如 `192.168.31.122` |
+| 代理网关 | 旁路由地址，例如 `192.168.31.xx` |
 | DHCP leases 路径 | 默认 `/tmp/dhcp.leases`；不同固件可改 |
 | SSH 密码 / SSH 私钥 | 二选一；保存后加密存放在数据卷，不需要每次输入 |
 | 小米后台密码 | 可选补充；名称优先从 `/data/etc/xqDb` 自动读取，不需要密码 |
@@ -125,7 +125,7 @@ docker run -d \
 | `ROUTER_WEB_PASSWORD` | 空 | 小米后台密码，可选；名称优先从 xqDb 自动读取 |
 | `XIAOMI_XQDB` | `/data/etc/xqDb` | 小米本地设备库路径；只读解析 |
 | `ROUTER_LEASE_FILE` | `/tmp/dhcp.leases` | dnsmasq 租约文件路径 |
-| `PROXY_GATEWAY` | `192.168.31.122` | 旁路由网关 |
+| `PROXY_GATEWAY` | 空 | 旁路由网关；未配置时「应用」会报错，需先在设置页填写 |
 | `ROUTER_CONF_DIR` | `/data/dnsmasq.d` | 路由器持久配置目录 |
 | `ROUTER_TMP_DIR` | `/tmp/dnsmasq.d` | dnsmasq 实际读取目录 |
 | `ROUTER_RESTART_CMD` | `/etc/init.d/dnsmasq restart` | 应用后重启 dnsmasq 的命令 |

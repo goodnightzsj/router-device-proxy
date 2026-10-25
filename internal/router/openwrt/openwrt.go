@@ -100,7 +100,7 @@ func (a *Adapter) Devices(ctx context.Context) ([]device.Device, error) {
 }
 
 func (a *Adapter) finish(d device.Device) device.Device {
-	if d.IP == a.ProxyGateway {
+	if a.ProxyGateway != "" && d.IP == a.ProxyGateway {
 		if d.Type == "unknown" {
 			d.Type = "router"
 		}
@@ -116,6 +116,11 @@ func (a *Adapter) finish(d device.Device) device.Device {
 }
 
 func (a *Adapter) Apply(ctx context.Context, policies map[string]policy.Policy) (string, error) {
+	// Without a gateway the dhcp-option lines would be emitted empty and the
+	// tagged devices would silently keep the router's default path.
+	if a.ProxyGateway == "" {
+		return "", fmt.Errorf("代理网关未配置，请先在设置里填写旁路由地址")
+	}
 	content := renderDnsmasq(policies, a.ProxyGateway)
 	if err := ctx.Err(); err != nil {
 		return "", err
