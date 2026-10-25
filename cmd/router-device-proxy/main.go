@@ -219,8 +219,25 @@ func (a *App) auth(next http.HandlerFunc) http.HandlerFunc {
 func secretPresence(settings []router.Setting, secrets map[string]string) map[string]bool {
 	out := make(map[string]bool)
 	for _, s := range settings {
-		if s.Secret {
-			out[s.Key] = secrets[s.Key] != ""
+		if !s.Secret {
+			continue
+		}
+		present := secrets[s.Key] != ""
+		for _, alias := range s.Aliases {
+			present = present || secrets[alias] != ""
+		}
+		out[s.Key] = present
+	}
+	return out
+}
+
+func expandClearSecrets(settings []router.Setting, keys []string) []string {
+	out := append([]string(nil), keys...)
+	for _, s := range settings {
+		for _, key := range keys {
+			if s.Key == key {
+				out = append(out, s.Aliases...)
+			}
 		}
 	}
 	return out
@@ -394,6 +411,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
+	clearSecrets := expandClearSecrets(a.set.Settings, body.ClearSecrets)
 	sc, newCfg, err := a.cfg.BuildSaved(config.Update{
 		RouterHost:   body.RouterHost,
 		RouterUser:   body.RouterUser,
@@ -402,7 +420,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		Key:          body.Key,
 		Options:      body.Options,
 		Secrets:      body.Secrets,
-		ClearSecrets: body.ClearSecrets,
+		ClearSecrets: clearSecrets,
 		ProxyGateway: body.ProxyGateway,
 		LeaseFile:    body.LeaseFile,
 	})

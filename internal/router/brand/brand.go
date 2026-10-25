@@ -37,6 +37,7 @@ func New(cfg config.Config) (router.Set, error) {
 		Label:       "小米后台密码（可选）",
 		Placeholder: "用于读取 Xiaomi 设备名称",
 		Secret:      true,
+		Aliases:     []string{"legacy_web_password"},
 	}
 	xiaomiPath := router.Setting{
 		Key:         "xiaomi_xqdb",
