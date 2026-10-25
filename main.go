@@ -33,8 +33,8 @@ type Config struct {
 	RouterUser     string
 	RouterPassword string
 	RouterKey      string
-	WebPassword    string
 	ProxyGateway   string
+	LeaseFile      string
 	ConfDir        string
 	TmpDir         string
 	RestartCmd     string
@@ -69,8 +69,8 @@ func loadConfig() Config {
 		RouterUser:     env("ROUTER_USER", "root"),
 		RouterPassword: os.Getenv("ROUTER_PASSWORD"),
 		RouterKey:      os.Getenv("ROUTER_KEY"),
-		WebPassword:    os.Getenv("ROUTER_WEB_PASSWORD"),
 		ProxyGateway:   env("PROXY_GATEWAY", "192.168.31.122"),
+		LeaseFile:      env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
 		ConfDir:        env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
 		TmpDir:         env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
 		RestartCmd:     env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
@@ -84,8 +84,8 @@ type SavedConfig struct {
 	AuthMethod        string `json:"auth_method"`
 	RouterPasswordEnc string `json:"router_password_enc,omitempty"`
 	RouterKeyEnc      string `json:"router_key_enc,omitempty"`
-	WebPasswordEnc    string `json:"web_password_enc,omitempty"`
 	ProxyGateway      string `json:"proxy_gateway"`
+	LeaseFile         string `json:"lease_file,omitempty"`
 	Salt              string `json:"salt"`
 }
 
@@ -180,6 +180,9 @@ func (a *App) loadSaved() error {
 	if sc.ProxyGateway != "" {
 		a.cfg.ProxyGateway = sc.ProxyGateway
 	}
+	if sc.LeaseFile != "" {
+		a.cfg.LeaseFile = sc.LeaseFile
+	}
 	if v, err := decryptString(sc.RouterPasswordEnc, a.cfg.AdminPassword, salt); err == nil && v != "" {
 		a.cfg.RouterPassword = v
 		a.cfg.RouterKey = ""
@@ -188,13 +191,10 @@ func (a *App) loadSaved() error {
 		a.cfg.RouterKey = v
 		a.cfg.RouterPassword = ""
 	}
-	if v, err := decryptString(sc.WebPasswordEnc, a.cfg.AdminPassword, salt); err == nil && v != "" {
-		a.cfg.WebPassword = v
-	}
 	return nil
 }
 
-func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gateway string) error {
+func (a *App) saveSaved(host, user, authMethod, password, key, gateway, leaseFile string) error {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return err
@@ -204,6 +204,7 @@ func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gate
 		RouterUser:   user,
 		AuthMethod:   authMethod,
 		ProxyGateway: gateway,
+		LeaseFile:    leaseFile,
 		Salt:         base64.StdEncoding.EncodeToString(salt),
 	}
 	var err error
@@ -225,13 +226,6 @@ func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gate
 			return err
 		}
 	}
-	if webPassword == "" {
-		webPassword = a.cfg.WebPassword
-	}
-	sc.WebPasswordEnc, err = encryptString(webPassword, a.cfg.AdminPassword, salt)
-	if err != nil {
-		return err
-	}
 	b, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {
 		return err
@@ -247,6 +241,9 @@ func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gate
 	a.cfg.RouterHost = host
 	a.cfg.RouterUser = user
 	a.cfg.ProxyGateway = gateway
+	if leaseFile != "" {
+		a.cfg.LeaseFile = leaseFile
+	}
 	if authMethod == "password" {
 		a.cfg.RouterPassword = password
 		a.cfg.RouterKey = ""
@@ -254,7 +251,6 @@ func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gate
 		a.cfg.RouterKey = key
 		a.cfg.RouterPassword = ""
 	}
-	a.cfg.WebPassword = webPassword
 	return nil
 }
 
@@ -435,8 +431,8 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"auth_method":        authMethod,
 		"has_password":       a.cfg.RouterPassword != "",
 		"has_key":            a.cfg.RouterKey != "",
-		"has_web_password":   a.cfg.WebPassword != "",
 		"proxy_gateway":      a.cfg.ProxyGateway,
+		"lease_file":         a.cfg.LeaseFile,
 		"conf_dir":           a.cfg.ConfDir,
 		"tmp_dir":            a.cfg.TmpDir,
 	})
@@ -453,8 +449,8 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		AuthMethod   string `json:"auth_method"`
 		Password     string `json:"password"`
 		Key          string `json:"key"`
-		WebPassword  string `json:"web_password"`
 		ProxyGateway string `json:"proxy_gateway"`
+		LeaseFile    string `json:"lease_file"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -470,7 +466,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
-	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.WebPassword, body.ProxyGateway); err != nil {
+	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.ProxyGateway, body.LeaseFile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

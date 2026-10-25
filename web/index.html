@@ -73,7 +73,7 @@
           <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
           <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
           <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
-          <label class="field"><span>小米后台密码（可选）</span><input id="cfg-webpass" type="password" placeholder="用于读取设备列表"></label>
+          <label class="field"><span>DHCP leases 路径</span><input id="cfg-lease" placeholder="/tmp/dhcp.leases"></label>
         </div>
         <div class="auth-tabs">
           <button type="button" data-auth="password" class="active">SSH 密码</button>
@@ -81,7 +81,7 @@
         </div>
         <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
         <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
-        <p class="hint">首次连接需要输入 SSH 密码或私钥；保存后会加密存放在数据卷，不需要每次输入。</p>
+        <p class="hint">首次连接需要输入 SSH 密码或私钥；保存后会加密存放在数据卷，不需要每次输入。设备列表通过 SSH 读取 dnsmasq leases + ip neigh，适配 OpenWrt/dnsmasq；其他固件可改 leases 路径。</p>
         <div class="dialog-actions">
           <button type="button" class="btn" id="test-btn">测试连接</button>
           <button type="button" class="btn" id="hook-btn">安装开机持久化</button>

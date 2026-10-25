@@ -20,7 +20,7 @@
   │
   ▼
 :8090  Go 单二进制（嵌入 UI）
-  ├─ 设备扫描：小米 API / SSH DHCP leases
+  ├─ 设备扫描：SSH（dnsmasq leases + ip neigh）
   ├─ 策略：/data/policy.json
   └─ SSH → 路由器
         ├─ /data/dnsmasq.d/proxy.conf   （持久）
@@ -55,7 +55,7 @@ docker compose up -d --build
 | 路由器 IP | 主路由地址，例如 `192.168.31.1` |
 | SSH 用户 | 通常是 `root` |
 | 代理网关 | 旁路由地址，例如 `192.168.31.122` |
-| 小米后台密码 | 可选；用于读取小米设备列表 |
+| DHCP leases 路径 | 默认 `/tmp/dhcp.leases`；不同固件可改 |
 | SSH 密码 / SSH 私钥 | 二选一；保存后加密存放在数据卷，不需要每次输入 |
 
 点 **测试连接** 验证 SSH，点 **安装开机持久化** 在路由器上写入 `/data/dnsmasq.d/restore.sh` 并挂到防火墙 include，重启后自动恢复。
@@ -71,7 +71,7 @@ docker compose up -d --build
 | `ROUTER_USER` | `root` | SSH 用户 |
 | `ROUTER_PASSWORD` | 空 | SSH 密码（也可在设置页保存） |
 | `ROUTER_KEY` | 空 | SSH 私钥内容（也可在设置页保存） |
-| `ROUTER_WEB_PASSWORD` | 空 | 小米后台密码，用于读取设备列表 |
+| `ROUTER_LEASE_FILE` | `/tmp/dhcp.leases` | dnsmasq 租约文件路径 |
 | `PROXY_GATEWAY` | `192.168.31.122` | 旁路由网关 |
 | `ROUTER_CONF_DIR` | `/data/dnsmasq.d` | 路由器持久配置目录 |
 | `ROUTER_TMP_DIR` | `/tmp/dnsmasq.d` | dnsmasq 实际读取目录 |
@@ -80,8 +80,9 @@ docker compose up -d --build
 
 ## 路由器要求
 
-- dnsmasq 使用 `conf-dir=/tmp/dnsmasq.d`（小米 AX3000T / OpenWrt 默认符合）
-- 路由器可通过 SSH 登录，且支持写 `/data` 或等效持久分区
+- 路由器可通过 SSH 读取 dnsmasq leases（默认 `/tmp/dhcp.leases`）和 `ip neigh` / `/proc/net/arp`
+- dnsmasq 使用 `conf-dir=/tmp/dnsmasq.d`（OpenWrt 默认符合；其他固件可改 `ROUTER_CONF_DIR` / `ROUTER_TMP_DIR`）
+- 路由器支持写 `/data` 或等效持久分区
 - 旁路由已配置透明代理和 DNS（本项目只负责下发网关/DNS，不修改 OpenClash 配置）
 
 ## 安全说明
@@ -121,7 +122,7 @@ go build -trimpath -ldflags="-s -w" -o rdp .
 
 - DHCP 下发需要设备重连/续租后生效
 - 目前只处理 IPv4；IPv6 分流未实现
-- 开机持久化 hook 面向 OpenWrt/小米固件；其他系统需自行适配
+- 开机持久化 hook 面向 OpenWrt/dnsmasq；其他系统需自行适配
 - 品牌识别依赖 OUI 库，未知设备显示 `Unknown`
 
 ## License

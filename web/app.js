@@ -224,7 +224,7 @@ async function openSettings() {
     $("#cfg-host").value = cfg.router_host || "";
     $("#cfg-user").value = cfg.router_user || "";
     $("#cfg-gateway").value = cfg.proxy_gateway || "";
-    $("#cfg-webpass").value = "";
+    $("#cfg-lease").value = cfg.lease_file || "";
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
     setAuthMethod(cfg.auth_method || "password");
@@ -294,8 +294,8 @@ $("#settings-form").addEventListener("submit", async (e) => {
     auth_method: currentAuthMethod(),
     password: $("#cfg-password").value,
     key: $("#cfg-key").value,
-    web_password: $("#cfg-webpass").value,
     proxy_gateway: $("#cfg-gateway").value.trim(),
+    lease_file: $("#cfg-lease").value.trim(),
   };
   try {
     await api("/api/config", { method: "POST", body: JSON.stringify(body) });

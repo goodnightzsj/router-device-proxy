@@ -5,11 +5,7 @@ import (
 	"compress/gzip"
 	_ "embed"
 	"encoding/csv"
-	"encoding/json"
-	"fmt"
 	"net"
-	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,20 +102,9 @@ func (a *App) scanDevices() ([]Device, error) {
 	if a.cfg.Mock {
 		return a.withPolicy(a.mockDevices()), nil
 	}
-	var devices []Device
-	var err error
-	if a.cfg.WebPassword != "" {
-		devices, err = a.xiaomiDevices()
-	}
-	if err != nil || len(devices) == 0 {
-		leaseDevices, lerr := a.leaseDevices()
-		if lerr != nil {
-			if err != nil {
-				return nil, fmt.Errorf("xiaomi: %v; lease: %v", err, lerr)
-			}
-			return nil, lerr
-		}
-		devices = leaseDevices
+	devices, err := a.sshDevices()
+	if err != nil {
+		return nil, err
 	}
 	return a.withPolicy(devices), nil
 }
@@ -141,100 +126,16 @@ func (a *App) withPolicy(devices []Device) []Device {
 	return devices
 }
 
-type xiaomiDevice struct {
-	MAC    string `json:"mac"`
-	Name   string `json:"name"`
-	Oname  string `json:"oname"`
-	Online int    `json:"online"`
-	Type   int    `json:"type"`
-	IP     []struct {
-		IP string `json:"ip"`
-	} `json:"ip"`
-	Company *struct {
-		Name string `json:"name"`
-	} `json:"company"`
-}
-
-func (a *App) xiaomiDevices() ([]Device, error) {
-	client := &http.Client{Timeout: 8 * time.Second}
-	form := url.Values{}
-	form.Set("username", "admin")
-	form.Set("password", a.cfg.WebPassword)
-	form.Set("logtype", "2")
-	resp, err := client.PostForm("http://"+a.cfg.RouterHost+"/cgi-bin/luci/api/xqsystem/login", form)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	var login struct {
-		Token string `json:"token"`
-		Code  int    `json:"code"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&login); err != nil {
-		return nil, err
-	}
-	if login.Token == "" {
-		return nil, fmt.Errorf("login returned no token")
-	}
-
-	apiURL := "http://" + a.cfg.RouterHost + "/cgi-bin/luci/;stok=" + login.Token + "/api/misystem/devicelist"
-	resp2, err := client.Get(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp2.Body.Close()
-	var list struct {
-		List []xiaomiDevice `json:"list"`
-	}
-	if err := json.NewDecoder(resp2.Body).Decode(&list); err != nil {
-		return nil, err
-	}
-
-	out := make([]Device, 0, len(list.List))
-	for _, d := range list.List {
-		if d.MAC == "" {
-			continue
-		}
-		ip := ""
-		if len(d.IP) > 0 {
-			ip = d.IP[0].IP
-		}
-		name := d.Name
-		if name == "" || name == "*" {
-			name = d.Oname
-		}
-		if name == "" {
-			name = d.MAC
-		}
-		brand := ""
-		if d.Company != nil {
-			brand = d.Company.Name
-		}
-		if brand == "" {
-			brand = vendor(d.MAC)
-		}
-		if brand == "" {
-			brand = "Unknown"
-		}
-		out = append(out, Device{
-			MAC:    strings.ToLower(d.MAC),
-			Name:   name,
-			Brand:  brand,
-			Type:   inferType(name, brand),
-			IP:     ip,
-			Online: d.Online == 1,
-			Source: "xiaomi",
-		})
-	}
-	return out, nil
-}
-
-func (a *App) leaseDevices() ([]Device, error) {
-	leases, err := a.sshRun("cat /tmp/dhcp.leases 2>/dev/null")
+// sshDevices reads the DHCP lease table and the ARP/neighbour table over SSH.
+// It is intentionally router-agnostic: any router that exposes dnsmasq leases
+// and ip neigh / proc net arp works.
+func (a *App) sshDevices() ([]Device, error) {
+	leases, err := a.sshRun("cat " + shellQuote(a.cfg.LeaseFile) + " 2>/dev/null")
 	if err != nil {
 		return nil, err
 	}
 	neigh, _ := a.sshRun("ip neigh 2>/dev/null")
+	arp, _ := a.sshRun("cat /proc/net/arp 2>/dev/null")
 
 	online := map[string]bool{}
 	neighIP := map[string]string{}
@@ -253,6 +154,25 @@ func (a *App) leaseDevices() ([]Device, error) {
 			online[mac] = true
 		}
 	}
+	for _, line := range strings.Split(arp, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 6 || f[0] == "IP" {
+			continue
+		}
+		if ip := net.ParseIP(f[0]); ip == nil || ip.To4() == nil {
+			continue
+		}
+		mac := strings.ToLower(f[3])
+		if !validMAC(mac) {
+			continue
+		}
+		if _, ok := neighIP[mac]; !ok {
+			neighIP[mac] = f[0]
+		}
+		if strings.EqualFold(f[2], "0x2") {
+			online[mac] = true
+		}
+	}
 
 	now := time.Now().Unix()
 	seen := map[string]bool{}
@@ -264,55 +184,50 @@ func (a *App) leaseDevices() ([]Device, error) {
 		}
 		exp, _ := strconv.ParseInt(f[0], 10, 64)
 		mac := strings.ToLower(f[1])
+		if !validMAC(mac) {
+			continue
+		}
 		ip := f[2]
 		name := f[3]
 		if name == "*" || name == "" {
 			name = mac
 		}
 		isOnline := exp == 0 || exp > now || online[mac]
-		brand := vendor(mac)
-		if brand == "" {
-			brand = "Unknown"
-		}
-		out = append(out, Device{
-			MAC:    mac,
-			Name:   name,
-			Brand:  brand,
-			Type:   inferType(name, brand),
-			IP:     ip,
-			Online: isOnline,
-			Source: "lease",
-		})
+		out = append(out, newDevice(mac, name, ip, isOnline, "lease"))
 		seen[mac] = true
 	}
 	for mac, ip := range neighIP {
-		if seen[mac] || !online[mac] {
+		if seen[mac] {
 			continue
 		}
-		brand := vendor(mac)
-		if brand == "" {
-			brand = "Unknown"
-		}
-		out = append(out, Device{
-			MAC:    mac,
-			Name:   mac,
-			Brand:  brand,
-			Type:   inferType("", brand),
-			IP:     ip,
-			Online: true,
-			Source: "neigh",
-		})
+		out = append(out, newDevice(mac, mac, ip, online[mac], "neigh"))
 	}
 	return out, nil
 }
 
+func newDevice(mac, name, ip string, online bool, source string) Device {
+	brand := vendor(mac)
+	if brand == "" {
+		brand = "Unknown"
+	}
+	return Device{
+		MAC:    mac,
+		Name:   name,
+		Brand:  brand,
+		Type:   inferType(name, brand),
+		IP:     ip,
+		Online: online,
+		Source: source,
+	}
+}
+
 func (a *App) mockDevices() []Device {
 	return []Device{
-		{MAC: "0e:f4:ec:d9:83:b7", Name: "Redmi-K50", Brand: "Xiaomi Communications", Type: "phone", IP: "192.168.31.192", Online: true, Source: "mock"},
-		{MAC: "1e:a1:55:77:56:2d", Name: "MacBook Pro", Brand: "Apple, Inc.", Type: "computer", IP: "192.168.31.23", Online: true, Source: "mock"},
-		{MAC: "94:8c:d7:13:73:e8", Name: "mibx5-washer", Brand: "Beijing Xiaomi Mobile Software", Type: "appliance", IP: "192.168.31.56", Online: true, Source: "mock"},
-		{MAC: "78:df:72:53:a2:3a", Name: "chuangmi_camera", Brand: "Shanghai Imilab Technology", Type: "camera", IP: "192.168.31.229", Online: true, Source: "mock"},
-		{MAC: "68:1d:ef:3b:67:31", Name: "iStoreOS", Brand: "Intel Corporate", Type: "router", IP: "192.168.31.122", Online: true, Source: "mock"},
-		{MAC: "aa:bb:cc:dd:ee:01", Name: "Living Room TV", Brand: "Samsung Electronics", Type: "tv", IP: "192.168.31.77", Online: false, Source: "mock"},
+		{MAC: "02:00:00:00:00:01", Name: "Living Room TV", Brand: "Example Display Co.", Type: "tv", IP: "192.168.31.51", Online: true, Source: "mock"},
+		{MAC: "02:00:00:00:00:02", Name: "Kitchen Speaker", Brand: "Example Audio Labs", Type: "speaker", IP: "192.168.31.52", Online: true, Source: "mock"},
+		{MAC: "02:00:00:00:00:03", Name: "Office Laptop", Brand: "Acme Computers", Type: "computer", IP: "192.168.31.53", Online: true, Source: "mock"},
+		{MAC: "02:00:00:00:00:04", Name: "Front Door Camera", Brand: "Example Vision", Type: "camera", IP: "192.168.31.54", Online: true, Source: "mock"},
+		{MAC: "02:00:00:00:00:05", Name: "Bedroom Phone", Brand: "Example Mobile", Type: "phone", IP: "192.168.31.55", Online: true, Source: "mock"},
+		{MAC: "02:00:00:00:00:06", Name: "Washing Machine", Brand: "Example Appliances", Type: "appliance", IP: "192.168.31.56", Online: false, Source: "mock"},
 	}
 }
