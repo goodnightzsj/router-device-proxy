@@ -114,6 +114,10 @@ function renderStats() {
   $("#stat-direct").textContent = onlineDevices.length - proxy;
 }
 
+function deviceTitle(d) {
+  return d.note || d.name;
+}
+
 function renderGrid() {
   const grid = $("#device-grid");
   const q = state.search.trim().toLowerCase();
@@ -122,7 +126,7 @@ function renderGrid() {
     if (state.filter === "proxy" && d.mode !== "proxy") return false;
     if (state.filter === "direct" && d.mode !== "direct") return false;
     if (!q) return true;
-    return [d.name, d.brand, d.mac, d.ip, d.type].some((v) =>
+    return [deviceTitle(d), d.name, d.note, d.brand, d.mac, d.ip, d.type].some((v) =>
       String(v || "").toLowerCase().includes(q)
     );
   });
@@ -132,20 +136,25 @@ function renderGrid() {
     return;
   }
 
+  const gateway = (state.config && state.config.proxy_gateway) || "";
   grid.innerHTML = list.map((d) => {
     const isProxy = d.mode === "proxy";
+    const isGateway = gateway !== "" && d.ip === gateway;
     const pending = state.pending.has(d.mac);
     const type = ICONS[d.type] ? d.type : "unknown";
     const brand = d.brand && d.brand !== "Unknown" ? d.brand : "";
     const meta = [brand, TYPE_LABELS[type]].filter(Boolean).join(" · ");
+    const title = deviceTitle(d);
     return `
       <article class="device ${isProxy ? "proxy" : ""} ${d.online ? "" : "offline"}">
         <div class="device-head">
           <div class="device-icon t-${type}">${ICONS[type]}</div>
           <div class="device-title">
-            <h3>${escapeHTML(d.name)}</h3>
+            <h3>${escapeHTML(title)}${d.note ? ' <span class="note-mark">备注</span>' : ""}</h3>
             <p>${escapeHTML(meta)}</p>
+            ${d.note && d.name && d.note !== d.name ? `<p class="device-original">原名称：${escapeHTML(d.name)}</p>` : ""}
           </div>
+          <button class="edit-note" data-note-mac="${escapeHTML(d.mac)}" title="修改备注" aria-label="修改备注">✎</button>
         </div>
         <div class="badges">
           <span class="tag ${d.online ? "online" : "offline"}">${d.online ? "在线" : "离线"}</span>
@@ -157,8 +166,10 @@ function renderGrid() {
           <div><span>IP</span><code>${escapeHTML(d.ip || "—")}</code></div>
         </div>
         <div class="device-foot">
-          <span class="mode-label ${isProxy ? "proxy" : ""}">当前：<b>${isProxy ? "代理" : "直连"}</b></span>
-          <button class="switch ${isProxy ? "on" : ""}" data-mac="${escapeHTML(d.mac)}" aria-label="切换代理"></button>
+          <span class="mode-label ${isProxy ? "proxy" : ""}">当前：<b>${isProxy ? "代理" : "直连"}</b>${isGateway ? ' <span class="tag gateway">代理网关</span>' : ""}</span>
+          ${isGateway
+            ? '<span class="switch-locked" title="代理网关不能走透明代理，否则会回环">固定直连</span>'
+            : `<button class="switch ${isProxy ? "on" : ""}" data-mac="${escapeHTML(d.mac)}" aria-label="切换代理"></button>`}
         </div>
       </article>`;
   }).join("");
@@ -166,7 +177,43 @@ function renderGrid() {
   $$(".switch", grid).forEach((btn) => {
     btn.addEventListener("click", () => toggleMode(btn.dataset.mac));
   });
+  $$(".edit-note", grid).forEach((btn) => {
+    btn.addEventListener("click", () => editNote(btn.dataset.noteMac));
+  });
 }
+
+let noteMAC = "";
+
+function editNote(mac) {
+  const d = state.devices.find((x) => x.mac === mac);
+  if (!d) return;
+  noteMAC = mac;
+  $("#note-input").value = d.note || "";
+  $("#note-target").textContent = `设备：${deviceTitle(d)} · ${d.ip || d.mac}`;
+  $("#note-dialog").showModal();
+  setTimeout(() => $("#note-input").focus(), 50);
+}
+
+async function saveNote(note) {
+  if (!noteMAC) return;
+  try {
+    await api("/api/note", { method: "POST", body: JSON.stringify({ mac: noteMAC, note }) });
+    const d = state.devices.find((x) => x.mac === noteMAC);
+    if (d) d.note = note;
+    $("#note-dialog").close();
+    renderAll();
+    showToast(note ? "备注已保存" : "备注已清除");
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+$("#note-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveNote($("#note-input").value.trim());
+});
+$("#clear-note").addEventListener("click", () => saveNote(""));
+$("#close-note").addEventListener("click", () => $("#note-dialog").close());
 
 function updateApply() {
   const n = state.pending.size;
@@ -245,12 +292,14 @@ function renderBrandSettings(settings, hasSecrets, options) {
     const id = `brand-${s.key}`;
     if (s.secret) {
       const saved = hasSecrets[s.key] ? "已保存，留空保持不变" : (s.placeholder || "可选");
-      return `<label class="field"><span>${escapeHTML(s.label)}</span>
-        <input id="${id}" data-brand-secret="${escapeHTML(s.key)}" type="password" autocomplete="off" placeholder="${escapeHTML(saved)}"></label>
-        <label class="check"><input type="checkbox" data-clear-secret="${escapeHTML(s.key)}"> 清除已保存的${escapeHTML(s.label)}</label>`;
+      return `<div class="brand-field">
+        <label class="field"><span>${escapeHTML(s.label)}</span>
+          <input id="${id}" data-brand-secret="${escapeHTML(s.key)}" type="password" autocomplete="off" placeholder="${escapeHTML(saved)}"></label>
+        <label class="check"><input type="checkbox" data-clear-secret="${escapeHTML(s.key)}"> 清除已保存的${escapeHTML(s.label)}</label>
+      </div>`;
     }
-    return `<label class="field"><span>${escapeHTML(s.label)}</span>
-      <input id="${id}" data-brand-option="${escapeHTML(s.key)}" value="${escapeHTML(options[s.key] || s.default || "")}" placeholder="${escapeHTML(s.placeholder || "")}"></label>`;
+    return `<div class="brand-field"><label class="field"><span>${escapeHTML(s.label)}</span>
+      <input id="${id}" data-brand-option="${escapeHTML(s.key)}" value="${escapeHTML(options[s.key] || s.default || "")}" placeholder="${escapeHTML(s.placeholder || "")}"></label></div>`;
   }).join("");
 }
 

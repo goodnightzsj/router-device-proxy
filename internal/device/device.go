@@ -27,6 +27,7 @@ type Device struct {
 	IP     string `json:"ip"`
 	Online bool   `json:"online"`
 	Mode   string `json:"mode"`
+	Note   string `json:"note,omitempty"` // user note; preferred over Name in UI
 	Source string `json:"source"`
 }
 
@@ -171,6 +172,20 @@ func CleanHostname(name, ip string) string {
 		name = string([]rune(name)[:64])
 	}
 	return name
+}
+
+// CleanNote trims a user note, strips control characters and caps its length.
+func CleanNote(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r < 32 || r == 127 {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(s))
+	if len([]rune(s)) > 64 {
+		s = string([]rune(s)[:64])
+	}
+	return s
 }
 
 func IsGenericName(name string) bool {

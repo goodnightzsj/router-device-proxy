@@ -75,7 +75,7 @@
           <h2>路由器连接</h2>
           <button type="button" class="icon-btn" id="close-settings">×</button>
         </div>
-        <div class="form-grid">
+        <div class="form-grid three">
           <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
           <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
           <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
@@ -84,16 +84,33 @@
           <button type="button" data-auth="password" class="active">SSH 密码</button>
           <button type="button" data-auth="key">SSH 私钥</button>
         </div>
-        <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
-        <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
-        <div id="brand-settings"></div>
-        <p class="hint">首次连接需要输入 SSH 密码或私钥；保存后会加密存放在数据卷。品牌相关设置由当前路由器适配器提供。</p>
+        <div class="settings-grid">
+          <label class="field" id="password-field"><span>SSH 密码</span><input id="cfg-password" type="password" placeholder="只保存在本机数据卷"></label>
+          <label class="field hidden" id="key-field"><span>SSH 私钥</span><textarea id="cfg-key" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea></label>
+          <div id="brand-settings"></div>
+        </div>
+        <p class="hint">SSH 凭据加密保存在数据卷；品牌设置由当前适配器提供。</p>
         <div class="dialog-actions">
           <button type="button" class="btn" id="test-btn">测试连接</button>
           <button type="button" class="btn" id="hook-btn">安装开机持久化</button>
           <button type="submit" class="btn primary">保存</button>
         </div>
         <pre id="settings-output" class="output hidden"></pre>
+      </form>
+    </dialog>
+
+    <dialog id="note-dialog" class="dialog note-dialog">
+      <form id="note-form">
+        <div class="dialog-head">
+          <h2>设备备注</h2>
+          <button type="button" class="icon-btn" id="close-note">×</button>
+        </div>
+        <label class="field"><span>备注（留空清除）</span><input id="note-input" maxlength="64" placeholder="例如：客厅手机"></label>
+        <p class="hint" id="note-target">—</p>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="clear-note">清除</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
       </form>
     </dialog>
   </div>

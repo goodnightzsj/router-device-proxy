@@ -77,6 +77,16 @@ func (s *Store) SetMode(mac, mode string) error {
 	return s.saveLocked()
 }
 
+func (s *Store) SetNote(mac, note string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mac = strings.ToLower(mac)
+	p := s.Devices[mac]
+	p.Name = note
+	s.Devices[mac] = p
+	return s.saveLocked()
+}
+
 func (s *Store) Get(mac string) (Policy, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -33,6 +33,8 @@ type App struct {
 	set   router.Set
 	saved config.SavedConfig
 	cfgMu sync.Mutex
+	gwMu  sync.RWMutex
+	gwMAC string
 }
 
 func (a *App) buildSet() router.Set {
@@ -85,7 +87,7 @@ func (a *App) applyNames(ctx context.Context, devs []device.Device) []device.Dev
 func (a *App) scanDevices(ctx context.Context) ([]device.Device, error) {
 	cfg, set := a.snapshot()
 	if cfg.Mock {
-		return a.applyPolicies(device.MockDevices()), nil
+		return a.applyPolicies(device.MockDevices(), cfg.ProxyGateway), nil
 	}
 	if set.Devices == nil {
 		return nil, router.ErrUnsupported
@@ -96,7 +98,7 @@ func (a *App) scanDevices(ctx context.Context) ([]device.Device, error) {
 	}
 	devs = a.applyNames(ctx, devs)
 	devs = a.discoverNames(ctx, devs)
-	return a.applyPolicies(devs), nil
+	return a.applyPolicies(devs, cfg.ProxyGateway), nil
 }
 
 func (a *App) discoverNames(ctx context.Context, devs []device.Device) []device.Device {
@@ -156,15 +158,36 @@ func (a *App) discoverNames(ctx context.Context, devs []device.Device) []device.
 	return devs
 }
 
-func (a *App) applyPolicies(devs []device.Device) []device.Device {
+func (a *App) applyPolicies(devs []device.Device, gateway string) []device.Device {
 	for i := range devs {
-		if p, ok := a.store.Get(devs[i].MAC); ok && p.Mode == "proxy" {
+		p, _ := a.store.Get(devs[i].MAC)
+		if p.Name != "" {
+			devs[i].Note = p.Name
+		}
+		if p.Mode == "proxy" {
 			devs[i].Mode = "proxy"
 		} else {
 			devs[i].Mode = "direct"
 		}
+		if gateway != "" && devs[i].IP == gateway {
+			// Proxying the proxy gateway itself would create a loop.
+			devs[i].Mode = "direct"
+			a.setGatewayMAC(devs[i].MAC)
+		}
 	}
 	return devs
+}
+
+func (a *App) setGatewayMAC(mac string) {
+	a.gwMu.Lock()
+	a.gwMAC = strings.ToLower(mac)
+	a.gwMu.Unlock()
+}
+
+func (a *App) gatewayMAC() string {
+	a.gwMu.RLock()
+	defer a.gwMu.RUnlock()
+	return a.gwMAC
 }
 
 func (a *App) sessionSecret() []byte {
@@ -325,7 +348,35 @@ func (a *App) handlePolicy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid mac or mode", http.StatusBadRequest)
 		return
 	}
+	if gm := a.gatewayMAC(); gm != "" && strings.EqualFold(gm, body.MAC) {
+		http.Error(w, "代理网关不能设置为透明代理", http.StatusBadRequest)
+		return
+	}
 	if err := a.store.SetMode(body.MAC, body.Mode); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleNote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		MAC  string `json:"mac"`
+		Note string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if !device.ValidMAC(body.MAC) {
+		http.Error(w, "invalid mac", http.StatusBadRequest)
+		return
+	}
+	if err := a.store.SetNote(body.MAC, device.CleanNote(body.Note)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -342,7 +393,11 @@ func (a *App) handleApply(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": router.ErrUnsupported.Error()})
 		return
 	}
-	out, err := set.Policy.Apply(r.Context(), a.store.Snapshot())
+	snapshot := a.store.Snapshot()
+	if gm := a.gatewayMAC(); gm != "" {
+		delete(snapshot, strings.ToLower(gm))
+	}
+	out, err := set.Policy.Apply(r.Context(), snapshot)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error(), "output": out})
 		return
@@ -500,6 +555,7 @@ func main() {
 	mux.HandleFunc("/api/status", a.auth(a.handleStatus))
 	mux.HandleFunc("/api/devices", a.auth(a.handleDevices))
 	mux.HandleFunc("/api/policy", a.auth(a.handlePolicy))
+	mux.HandleFunc("/api/note", a.auth(a.handleNote))
 	mux.HandleFunc("/api/apply", a.auth(a.handleApply))
 	mux.HandleFunc("/api/config", a.auth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
