@@ -7,6 +7,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -147,8 +148,7 @@ type xiaomiDevice struct {
 	Online int    `json:"online"`
 	Type   int    `json:"type"`
 	IP     []struct {
-		IP     string `json:"ip"`
-		Online int    `json:"online"`
+		IP string `json:"ip"`
 	} `json:"ip"`
 	Company *struct {
 		Name string `json:"name"`
@@ -241,6 +241,9 @@ func (a *App) leaseDevices() ([]Device, error) {
 	for _, line := range strings.Split(neigh, "\n") {
 		f := strings.Fields(line)
 		if len(f) < 5 || f[3] != "lladdr" {
+			continue
+		}
+		if ip := net.ParseIP(f[0]); ip == nil || ip.To4() == nil {
 			continue
 		}
 		mac := strings.ToLower(f[4])
