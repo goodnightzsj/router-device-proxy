@@ -76,7 +76,9 @@ func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
 		return devices
 	}
 	if xc := a.xiaomiClient(); xc != nil && xc.configured() {
-		devices = a.applyXiaomiNames(ctx, devices, xc)
+		xctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		devices = a.applyXiaomiNames(xctx, devices, xc)
+		cancel()
 	}
 	if !a.cfg.Discovery || a.names == nil {
 		return devices
