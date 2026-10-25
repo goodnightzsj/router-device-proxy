@@ -30,6 +30,7 @@ func New(cfg config.Config) (router.Set, error) {
 		Health:      ow,
 		Brand:       "openwrt",
 		Caps:        router.Capabilities{Devices: true, Names: true, Policy: true, Persistence: true},
+		Settings:    openwrt.Settings(),
 	}
 	switch cfg.Brand {
 	case "", "auto":

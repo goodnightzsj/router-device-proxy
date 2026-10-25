@@ -223,6 +223,9 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 	if sc.LeaseFile != "" {
 		cfg.LeaseFile = sc.LeaseFile
 	}
+	if v := cfg.Options["lease_file"]; v != "" {
+		cfg.LeaseFile = v
+	}
 	if v, err := decryptString(sc.RouterPasswordEnc, admin, salt); err == nil && v != "" {
 		cfg.RouterPassword = v
 		cfg.RouterKey = ""
@@ -313,6 +316,9 @@ func (cfg Config) BuildSaved(u Update) (SavedConfig, Config, error) {
 	cfg.ProxyGateway = u.ProxyGateway
 	if u.LeaseFile != "" {
 		cfg.LeaseFile = u.LeaseFile
+	}
+	if v := options["lease_file"]; v != "" {
+		cfg.LeaseFile = v
 	}
 	if u.AuthMethod == "password" {
 		cfg.RouterPassword = password

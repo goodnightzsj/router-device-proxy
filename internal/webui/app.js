@@ -277,7 +277,6 @@ async function openSettings() {
     $("#cfg-host").value = cfg.router_host || "";
     $("#cfg-user").value = cfg.router_user || "";
     $("#cfg-gateway").value = cfg.proxy_gateway || "";
-    $("#cfg-lease").value = cfg.lease_file || "";
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
     renderBrandSettings(cfg.settings || [], cfg.has_secrets || {}, cfg.options || {});
@@ -353,7 +352,6 @@ $("#settings-form").addEventListener("submit", async (e) => {
     secrets: collectBrandSecrets(),
     clear_secrets: collectClearSecrets(),
     proxy_gateway: $("#cfg-gateway").value.trim(),
-    lease_file: $("#cfg-lease").value.trim(),
   };
   try {
     await api("/api/config", { method: "POST", body: JSON.stringify(body) });

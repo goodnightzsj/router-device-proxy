@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Router Device Proxy</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <div id="boot" class="boot">
-    <div class="brand-mark">RDP</div>
+    <div class="brand-mark"><img src="/icon.svg" alt=""></div>
     <p class="muted">正在连接路由器…</p>
   </div>
 
   <div id="login" class="login-wrap hidden">
     <form class="login-card" id="login-form">
-      <div class="brand-mark">RDP</div>
+      <div class="brand-mark"><img src="/icon.svg" alt=""></div>
       <h1>Router Device Proxy</h1>
       <p class="muted">按设备选择直连或透明代理</p>
       <label class="field">
@@ -30,7 +31,7 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark small">RDP</span>
+        <span class="brand-mark small"><img src="/icon.svg" alt=""></span>
         <div>
           <h1>Router Device Proxy</h1>
           <p class="muted" id="router-line">—</p>
@@ -78,7 +79,6 @@
           <label class="field"><span>路由器 IP</span><input id="cfg-host" placeholder="192.168.31.1"></label>
           <label class="field"><span>SSH 用户</span><input id="cfg-user" placeholder="root"></label>
           <label class="field"><span>代理网关</span><input id="cfg-gateway" placeholder="192.168.31.122"></label>
-          <label class="field"><span>DHCP leases 路径</span><input id="cfg-lease" placeholder="/tmp/dhcp.leases"></label>
         </div>
         <div class="auth-tabs">
           <button type="button" data-auth="password" class="active">SSH 密码</button>
