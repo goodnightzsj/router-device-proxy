@@ -47,7 +47,7 @@ type SavedConfig struct {
 
 	// Legacy field from the pre-refactor single-brand config. Read once and
 	// migrated into SecretsEnc; never written by new code.
-	RouterWebPasswordEnc string `json:"router_web_password_enc,omitempty"`
+	LegacySecretEnc string `json:"router_web_password_enc,omitempty"`
 
 	ProxyGateway string `json:"proxy_gateway"`
 	LeaseFile    string `json:"lease_file,omitempty"`
@@ -239,8 +239,8 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 		}
 	}
 	// One-time migration from the pre-refactor single-brand field.
-	if len(secrets) == 0 && sc.RouterWebPasswordEnc != "" {
-		if v, err := decryptString(sc.RouterWebPasswordEnc, admin, salt); err == nil && v != "" {
+	if len(secrets) == 0 && sc.LegacySecretEnc != "" {
+		if v, err := decryptString(sc.LegacySecretEnc, admin, salt); err == nil && v != "" {
 			secrets["legacy_web_password"] = v
 		}
 	}
