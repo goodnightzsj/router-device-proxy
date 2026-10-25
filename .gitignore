@@ -5,4 +5,4 @@ data/
 !docs/screenshot.png
 .env
 
-router-device-proxy
+/router-device-proxy
