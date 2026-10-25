@@ -2,16 +2,19 @@
 
 按设备选择 **直连** 或 **透明代理** 的轻量 Web 控制台。默认设备继续走主路由直连，只有被标记的设备通过旁路由（OpenClash / Clash）上网；旁路由故障不会影响直连设备。
 
+设备列表通过 SSH 读取，名称会用 DNS PTR、NetBIOS、mDNS、LLMNR 和 SSDP/UPnP 自动补全。
+
 ![screenshot](docs/screenshot.png)
 
 ## 功能
 
 - 自动扫描路由器下的设备：名称、品牌、MAC、IP、在线状态
+- 名称补全：DHCP 租约 + DNS PTR / NetBIOS / mDNS / LLMNR / SSDP
 - 按设备切换 `直连 / 透明代理`
 - 通过 dnsmasq 的 `dhcp-host` + `dhcp-option` 下发网关/DNS，设备续租后生效
 - 策略持久化：容器数据卷 + 路由器 `/data` + 开机 hook
 - 单密码登录；路由器 SSH 密码/私钥加密保存在数据卷
-- 单二进制 + 嵌入前端，Docker 镜像基于 `scratch`，约 8–10MB
+- 单二进制 + 嵌入前端，Docker 镜像基于 `scratch`，约 10–12MB
 
 ## 工作原理
 
@@ -20,7 +23,8 @@
   │
   ▼
 :8090  Go 单二进制（嵌入 UI）
-  ├─ 设备扫描：SSH（dnsmasq leases + ip neigh）
+  ├─ 设备扫描：SSH（dnsmasq leases + ip neigh + /proc/net/arp）
+  ├─ 名称补全：DNS PTR / NetBIOS / mDNS / LLMNR / SSDP
   ├─ 策略：/data/policy.json
   └─ SSH → 路由器
         ├─ /data/dnsmasq.d/proxy.conf   （持久）
@@ -38,6 +42,22 @@ dhcp-option=tag:proxy,6,192.168.31.122
 
 未标记设备继续使用主路由下发的网关/DNS，直连不受旁路由影响。
 
+## 设备名称来源
+
+| 来源 | 说明 |
+|---|---|
+| DHCP lease | 客户端主动上报的 hostname；很多手机/IoT 不传 |
+| DNS PTR | dnsmasq 已知的租约/静态主机名 |
+| NetBIOS | Windows / Samba 计算机名 |
+| mDNS | Apple / IoT / 打印机等的 `.local` 名称 |
+| LLMNR | Windows / systemd-resolved 本地名称 |
+| SSDP/UPnP | 电视、NAS、路由器的 `friendlyName` |
+| OUI | 厂商名（已内置） |
+
+补全结果缓存 10 分钟，且不会覆盖 DHCP 已经上报的名称。SSDP 依赖组播，容器需要使用 `--network host`；bridge 模式仍可跑 DNS/NetBIOS/mDNS 的单播回退。
+
+小米后台里的 `Redmi-K50` 这类名字来自小米自己的 SQLite 设备库（`/data/etc/xqDb`），不属于通用协议；本工具不会读取厂商私有数据库。
+
 ## 快速开始
 
 ```bash
@@ -54,7 +74,8 @@ docker compose up -d --build
 docker run -d \
   --name router-device-proxy \
   --restart always \
-  -p 18099:8090 \
+  --network host \
+  -e ADDR=:18099 \
   -e TZ=Asia/Shanghai \
   -e ADMIN_PASSWORD="$(cat /path/to/admin-password.txt)" \
   -e ROUTER_HOST=192.168.31.1 \
@@ -66,7 +87,11 @@ docker run -d \
   <DOCKERHUB_USERNAME>/router-device-proxy:latest
 ```
 
-容器内监听 `8090`，宿主机端口可以换成任意空闲端口。也可以直接 `-e ADMIN_PASSWORD='...'`，不一定要密码文件。
+`--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 就是宿主机监听端口，18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
+
+如果只能用 bridge 网络，把 `--network host` 换成 `-p 18099:8090` 并去掉 `ADDR`；DNS/NetBIOS/mDNS 仍可用，SSDP 不会工作。
+
+也可以直接用 `-e ADMIN_PASSWORD='...'`，不一定要密码文件。
 
 首次登录后点右上角 **⚙ 设置**：
 
@@ -85,7 +110,7 @@ docker run -d \
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `ADMIN_PASSWORD` | 必填 | Web 登录密码 |
-| `ADDR` | `:8090` | 监听地址 |
+| `ADDR` | `:8090` | 监听地址；host 网络下就是宿主机端口 |
 | `DATA_DIR` | `/data` | 数据卷 |
 | `ROUTER_HOST` | `192.168.31.1` | 主路由 IP |
 | `ROUTER_USER` | `root` | SSH 用户 |
@@ -96,6 +121,9 @@ docker run -d \
 | `ROUTER_CONF_DIR` | `/data/dnsmasq.d` | 路由器持久配置目录 |
 | `ROUTER_TMP_DIR` | `/tmp/dnsmasq.d` | dnsmasq 实际读取目录 |
 | `ROUTER_RESTART_CMD` | `/etc/init.d/dnsmasq restart` | 应用后重启 dnsmasq 的命令 |
+| `DISCOVERY` | `true` | 启用名称补全（DNS/NetBIOS/mDNS/LLMNR） |
+| `DISCOVERY_SSDP` | `true` | 启用 SSDP/UPnP；需要 host 网络 |
+| `DISCOVERY_TIMEOUT` | `2s` | 单个协议的超时 |
 | `MOCK` | `false` | 本地 UI 调试模式，不连路由器 |
 
 ## 路由器要求
@@ -114,6 +142,8 @@ docker run -d \
 - 容器以 root 运行以写数据卷；如要降权，请自行调整卷权限
 
 ## 本地开发
+
+需要 Go 1.27.1+；`go.mod` 已声明，Go 1.21+ 会自动下载工具链。
 
 ```bash
 ADMIN_PASSWORD=test MOCK=1 DATA_DIR=./data go run .
@@ -143,7 +173,8 @@ go build -trimpath -ldflags="-s -w" -o rdp .
 - DHCP 下发需要设备重连/续租后生效
 - 目前只处理 IPv4；IPv6 分流未实现
 - 开机持久化 hook 面向 OpenWrt/dnsmasq；其他系统需自行适配
-- 品牌识别依赖 OUI 库，未知设备显示 `Unknown`
+- 名称补全依赖设备是否响应 DNS/NetBIOS/mDNS/SSDP；小米私有设备名（xqDb）不在通用协议内
+- 品牌识别依赖 OUI 库，未知设备显示 `未知设备`
 
 ## License
 

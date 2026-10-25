@@ -26,19 +26,22 @@ import (
 var webFS embed.FS
 
 type Config struct {
-	Addr           string
-	DataDir        string
-	AdminPassword  string
-	RouterHost     string
-	RouterUser     string
-	RouterPassword string
-	RouterKey      string
-	ProxyGateway   string
-	LeaseFile      string
-	ConfDir        string
-	TmpDir         string
-	RestartCmd     string
-	Mock           bool
+	Addr             string
+	DataDir          string
+	AdminPassword    string
+	RouterHost       string
+	RouterUser       string
+	RouterPassword   string
+	RouterKey        string
+	ProxyGateway     string
+	LeaseFile        string
+	ConfDir          string
+	TmpDir           string
+	RestartCmd       string
+	Discovery        bool
+	DiscoverySSDP    bool
+	DiscoveryTimeout time.Duration
+	Mock             bool
 }
 
 func env(k, def string) string {
@@ -60,21 +63,36 @@ func envBool(k string, def bool) bool {
 	return b
 }
 
+func envDuration(k string, def time.Duration) time.Duration {
+	v := os.Getenv(k)
+	if v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return def
+	}
+	return d
+}
+
 func loadConfig() Config {
 	return Config{
-		Addr:           env("ADDR", ":8090"),
-		DataDir:        env("DATA_DIR", "/data"),
-		AdminPassword:  os.Getenv("ADMIN_PASSWORD"),
-		RouterHost:     env("ROUTER_HOST", "192.168.31.1"),
-		RouterUser:     env("ROUTER_USER", "root"),
-		RouterPassword: os.Getenv("ROUTER_PASSWORD"),
-		RouterKey:      os.Getenv("ROUTER_KEY"),
-		ProxyGateway:   env("PROXY_GATEWAY", "192.168.31.122"),
-		LeaseFile:      env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
-		ConfDir:        env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
-		TmpDir:         env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
-		RestartCmd:     env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
-		Mock:           envBool("MOCK", false),
+		Addr:             env("ADDR", ":8090"),
+		DataDir:          env("DATA_DIR", "/data"),
+		AdminPassword:    os.Getenv("ADMIN_PASSWORD"),
+		RouterHost:       env("ROUTER_HOST", "192.168.31.1"),
+		RouterUser:       env("ROUTER_USER", "root"),
+		RouterPassword:   os.Getenv("ROUTER_PASSWORD"),
+		RouterKey:        os.Getenv("ROUTER_KEY"),
+		ProxyGateway:     env("PROXY_GATEWAY", "192.168.31.122"),
+		LeaseFile:        env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
+		ConfDir:          env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
+		TmpDir:           env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
+		RestartCmd:       env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
+		Discovery:        envBool("DISCOVERY", true),
+		DiscoverySSDP:    envBool("DISCOVERY_SSDP", true),
+		DiscoveryTimeout: envDuration("DISCOVERY_TIMEOUT", 2*time.Second),
+		Mock:             envBool("MOCK", false),
 	}
 }
 
@@ -92,6 +110,7 @@ type SavedConfig struct {
 type App struct {
 	cfg   Config
 	store *Store
+	names *nameCache
 	cfgMu sync.Mutex
 	saved SavedConfig
 }
@@ -353,7 +372,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleDevices(w http.ResponseWriter, r *http.Request) {
-	devices, err := a.scanDevices()
+	devices, err := a.scanDevices(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"devices": devices, "error": err.Error()})
 		return
@@ -484,6 +503,7 @@ func main() {
 		log.Fatalf("data dir: %v", err)
 	}
 	a := &App{cfg: cfg}
+	a.names = newNameCache()
 	if err := a.loadSaved(); err != nil {
 		log.Printf("load saved config: %v", err)
 	}
@@ -516,6 +536,7 @@ func main() {
 	}
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 
-	log.Printf("router-device-proxy listening on %s (mock=%v, router=%s)", cfg.Addr, cfg.Mock, cfg.RouterHost)
+	log.Printf("router-device-proxy listening on %s (mock=%v, router=%s, discovery=%v, ssdp=%v, timeout=%v)",
+		cfg.Addr, cfg.Mock, cfg.RouterHost, cfg.Discovery, cfg.DiscoverySSDP, cfg.DiscoveryTimeout)
 	log.Fatal(http.ListenAndServe(cfg.Addr, mux))
 }

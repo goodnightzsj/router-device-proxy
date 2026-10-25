@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	_ "embed"
 	"encoding/csv"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -116,7 +118,7 @@ func isLocallyAdministered(mac string) bool {
 	return b&0x02 != 0
 }
 
-func (a *App) scanDevices() ([]Device, error) {
+func (a *App) scanDevices(ctx context.Context) ([]Device, error) {
 	if a.cfg.Mock {
 		return a.withPolicy(a.mockDevices()), nil
 	}
@@ -124,6 +126,7 @@ func (a *App) scanDevices() ([]Device, error) {
 	if err != nil {
 		return nil, err
 	}
+	devices = a.enrichDevices(ctx, devices)
 	return a.withPolicy(devices), nil
 }
 
@@ -226,10 +229,45 @@ func (a *App) sshDevices() ([]Device, error) {
 // finishDevice adds facts only the app knows, such as which IP is the proxy
 // gateway. It never overwrites a name or type discovered from the router.
 func (a *App) finishDevice(d Device) Device {
-	if d.IP == a.cfg.ProxyGateway && d.Type == "unknown" {
-		d.Type = "router"
+	if d.IP == a.cfg.ProxyGateway {
+		if d.Type == "unknown" {
+			d.Type = "router"
+		}
+		if (d.Name == "" || d.Name == d.MAC) && localIP(d.IP) {
+			if h, err := os.Hostname(); err == nil && usableHostname(h) {
+				d.Name = h
+			}
+		}
 	}
 	return d
+}
+
+func localIP(ip string) bool {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.String() == ip {
+			return true
+		}
+	}
+	return false
+}
+
+// usableHostname rejects Docker's short container IDs, which are what
+// os.Hostname returns when the container is not given --hostname.
+func usableHostname(h string) bool {
+	h = strings.TrimSpace(h)
+	if h == "" || h == "localhost" {
+		return false
+	}
+	if len(h) == 12 {
+		if _, err := strconv.ParseUint(h, 16, 64); err == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func newDevice(mac, name, ip string, online bool, source string) Device {
