@@ -48,6 +48,26 @@ docker compose up -d --build
 
 打开 `http://<运行主机>:8090`，输入 `ADMIN_PASSWORD` 登录。
 
+### 直接使用 docker run
+
+```bash
+docker run -d \
+  --name router-device-proxy \
+  --restart always \
+  -p 18099:8090 \
+  -e TZ=Asia/Shanghai \
+  -e ADMIN_PASSWORD="$(cat /path/to/admin-password.txt)" \
+  -e ROUTER_HOST=192.168.31.1 \
+  -e ROUTER_USER=root \
+  -e ROUTER_PASSWORD='你的路由器 SSH 密码' \
+  -e PROXY_GATEWAY=192.168.31.122 \
+  -e ROUTER_LEASE_FILE=/tmp/dhcp.leases \
+  -v /path/to/data:/data \
+  <DOCKERHUB_USERNAME>/router-device-proxy:latest
+```
+
+容器内监听 `8090`，宿主机端口可以换成任意空闲端口。也可以直接 `-e ADMIN_PASSWORD='...'`，不一定要密码文件。
+
 首次登录后点右上角 **⚙ 设置**：
 
 | 字段 | 说明 |
