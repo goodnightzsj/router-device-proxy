@@ -26,22 +26,23 @@ import (
 var webFS embed.FS
 
 type Config struct {
-	Addr             string
-	DataDir          string
-	AdminPassword    string
-	RouterHost       string
-	RouterUser       string
-	RouterPassword   string
-	RouterKey        string
-	ProxyGateway     string
-	LeaseFile        string
-	ConfDir          string
-	TmpDir           string
-	RestartCmd       string
-	Discovery        bool
-	DiscoverySSDP    bool
-	DiscoveryTimeout time.Duration
-	Mock             bool
+	Addr              string
+	DataDir           string
+	AdminPassword     string
+	RouterHost        string
+	RouterUser        string
+	RouterPassword    string
+	RouterKey         string
+	RouterWebPassword string
+	ProxyGateway      string
+	LeaseFile         string
+	ConfDir           string
+	TmpDir            string
+	RestartCmd        string
+	Discovery         bool
+	DiscoverySSDP     bool
+	DiscoveryTimeout  time.Duration
+	Mock              bool
 }
 
 func env(k, def string) string {
@@ -77,42 +78,45 @@ func envDuration(k string, def time.Duration) time.Duration {
 
 func loadConfig() Config {
 	return Config{
-		Addr:             env("ADDR", ":8090"),
-		DataDir:          env("DATA_DIR", "/data"),
-		AdminPassword:    os.Getenv("ADMIN_PASSWORD"),
-		RouterHost:       env("ROUTER_HOST", "192.168.31.1"),
-		RouterUser:       env("ROUTER_USER", "root"),
-		RouterPassword:   os.Getenv("ROUTER_PASSWORD"),
-		RouterKey:        os.Getenv("ROUTER_KEY"),
-		ProxyGateway:     env("PROXY_GATEWAY", "192.168.31.122"),
-		LeaseFile:        env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
-		ConfDir:          env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
-		TmpDir:           env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
-		RestartCmd:       env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
-		Discovery:        envBool("DISCOVERY", true),
-		DiscoverySSDP:    envBool("DISCOVERY_SSDP", true),
-		DiscoveryTimeout: envDuration("DISCOVERY_TIMEOUT", 2*time.Second),
-		Mock:             envBool("MOCK", false),
+		Addr:              env("ADDR", ":8090"),
+		DataDir:           env("DATA_DIR", "/data"),
+		AdminPassword:     os.Getenv("ADMIN_PASSWORD"),
+		RouterHost:        env("ROUTER_HOST", "192.168.31.1"),
+		RouterUser:        env("ROUTER_USER", "root"),
+		RouterPassword:    os.Getenv("ROUTER_PASSWORD"),
+		RouterKey:         os.Getenv("ROUTER_KEY"),
+		RouterWebPassword: os.Getenv("ROUTER_WEB_PASSWORD"),
+		ProxyGateway:      env("PROXY_GATEWAY", "192.168.31.122"),
+		LeaseFile:         env("ROUTER_LEASE_FILE", "/tmp/dhcp.leases"),
+		ConfDir:           env("ROUTER_CONF_DIR", "/data/dnsmasq.d"),
+		TmpDir:            env("ROUTER_TMP_DIR", "/tmp/dnsmasq.d"),
+		RestartCmd:        env("ROUTER_RESTART_CMD", "/etc/init.d/dnsmasq restart"),
+		Discovery:         envBool("DISCOVERY", true),
+		DiscoverySSDP:     envBool("DISCOVERY_SSDP", true),
+		DiscoveryTimeout:  envDuration("DISCOVERY_TIMEOUT", 2*time.Second),
+		Mock:              envBool("MOCK", false),
 	}
 }
 
 type SavedConfig struct {
-	RouterHost        string `json:"router_host"`
-	RouterUser        string `json:"router_user"`
-	AuthMethod        string `json:"auth_method"`
-	RouterPasswordEnc string `json:"router_password_enc,omitempty"`
-	RouterKeyEnc      string `json:"router_key_enc,omitempty"`
-	ProxyGateway      string `json:"proxy_gateway"`
-	LeaseFile         string `json:"lease_file,omitempty"`
-	Salt              string `json:"salt"`
+	RouterHost           string `json:"router_host"`
+	RouterUser           string `json:"router_user"`
+	AuthMethod           string `json:"auth_method"`
+	RouterPasswordEnc    string `json:"router_password_enc,omitempty"`
+	RouterKeyEnc         string `json:"router_key_enc,omitempty"`
+	RouterWebPasswordEnc string `json:"router_web_password_enc,omitempty"`
+	ProxyGateway         string `json:"proxy_gateway"`
+	LeaseFile            string `json:"lease_file,omitempty"`
+	Salt                 string `json:"salt"`
 }
 
 type App struct {
-	cfg   Config
-	store *Store
-	names *nameCache
-	cfgMu sync.Mutex
-	saved SavedConfig
+	cfg    Config
+	store  *Store
+	names  *nameCache
+	xiaomi *xiaomiClient
+	cfgMu  sync.Mutex
+	saved  SavedConfig
 }
 
 func deriveKey(password string, salt []byte) []byte {
@@ -210,10 +214,13 @@ func (a *App) loadSaved() error {
 		a.cfg.RouterKey = v
 		a.cfg.RouterPassword = ""
 	}
+	if v, err := decryptString(sc.RouterWebPasswordEnc, a.cfg.AdminPassword, salt); err == nil && v != "" {
+		a.cfg.RouterWebPassword = v
+	}
 	return nil
 }
 
-func (a *App) saveSaved(host, user, authMethod, password, key, gateway, leaseFile string) error {
+func (a *App) saveSaved(host, user, authMethod, password, key, webPassword, gateway, leaseFile string) error {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return err
@@ -245,6 +252,13 @@ func (a *App) saveSaved(host, user, authMethod, password, key, gateway, leaseFil
 			return err
 		}
 	}
+	if webPassword == "" {
+		webPassword = a.cfg.RouterWebPassword
+	}
+	sc.RouterWebPasswordEnc, err = encryptString(webPassword, a.cfg.AdminPassword, salt)
+	if err != nil {
+		return err
+	}
 	b, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {
 		return err
@@ -270,6 +284,8 @@ func (a *App) saveSaved(host, user, authMethod, password, key, gateway, leaseFil
 		a.cfg.RouterKey = key
 		a.cfg.RouterPassword = ""
 	}
+	a.cfg.RouterWebPassword = webPassword
+	a.xiaomi = newXiaomiClient(host, webPassword)
 	return nil
 }
 
@@ -429,15 +445,16 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"router_host":   a.cfg.RouterHost,
-		"router_user":   a.cfg.RouterUser,
-		"auth_method":   authMethod,
-		"has_password":  a.cfg.RouterPassword != "",
-		"has_key":       a.cfg.RouterKey != "",
-		"proxy_gateway": a.cfg.ProxyGateway,
-		"lease_file":    a.cfg.LeaseFile,
-		"conf_dir":      a.cfg.ConfDir,
-		"tmp_dir":       a.cfg.TmpDir,
+		"router_host":      a.cfg.RouterHost,
+		"router_user":      a.cfg.RouterUser,
+		"auth_method":      authMethod,
+		"has_password":     a.cfg.RouterPassword != "",
+		"has_key":          a.cfg.RouterKey != "",
+		"has_web_password": a.cfg.RouterWebPassword != "",
+		"proxy_gateway":    a.cfg.ProxyGateway,
+		"lease_file":       a.cfg.LeaseFile,
+		"conf_dir":         a.cfg.ConfDir,
+		"tmp_dir":          a.cfg.TmpDir,
 	})
 }
 
@@ -452,6 +469,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		AuthMethod   string `json:"auth_method"`
 		Password     string `json:"password"`
 		Key          string `json:"key"`
+		WebPassword  string `json:"web_password"`
 		ProxyGateway string `json:"proxy_gateway"`
 		LeaseFile    string `json:"lease_file"`
 	}
@@ -469,7 +487,7 @@ func (a *App) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
-	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.ProxyGateway, body.LeaseFile); err != nil {
+	if err := a.saveSaved(body.RouterHost, body.RouterUser, body.AuthMethod, body.Password, body.Key, body.WebPassword, body.ProxyGateway, body.LeaseFile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -507,6 +525,7 @@ func main() {
 	if err := a.loadSaved(); err != nil {
 		log.Printf("load saved config: %v", err)
 	}
+	a.xiaomi = newXiaomiClient(a.cfg.RouterHost, a.cfg.RouterWebPassword)
 	a.store = NewStore(filepath.Join(cfg.DataDir, "policy.json"))
 	if err := a.store.Load(); err != nil {
 		log.Printf("load policy: %v", err)

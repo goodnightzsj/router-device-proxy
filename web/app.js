@@ -245,6 +245,10 @@ async function openSettings() {
     $("#cfg-lease").value = cfg.lease_file || "";
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
+    $("#cfg-web-password").value = "";
+    $("#cfg-web-password").placeholder = cfg.has_web_password
+      ? "已保存，留空保持不变"
+      : "用于读取 Xiaomi 设备名称";
     setAuthMethod(cfg.auth_method || "password");
     $("#settings-output").classList.add("hidden");
     $("#settings-dialog").showModal();
@@ -312,6 +316,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
     auth_method: currentAuthMethod(),
     password: $("#cfg-password").value,
     key: $("#cfg-key").value,
+    web_password: $("#cfg-web-password").value,
     proxy_gateway: $("#cfg-gateway").value.trim(),
     lease_file: $("#cfg-lease").value.trim(),
   };

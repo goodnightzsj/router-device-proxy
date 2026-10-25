@@ -52,6 +52,7 @@ dhcp-option=tag:proxy,6,192.168.31.122
 | mDNS | Apple / IoT / 打印机等的 `.local` 名称 |
 | LLMNR | Windows / systemd-resolved 本地名称 |
 | SSDP/UPnP | 电视、NAS、路由器的 `friendlyName` |
+| 小米设备库（可选） | 通过本地 `misystem/devicelist` 读取 Xiaomi 后台显示名，如 `Redmi-K50`；需填写小米后台密码 |
 | OUI | 厂商名（已内置） |
 
 补全结果缓存 10 分钟，且不会覆盖 DHCP 已经上报的名称。SSDP 依赖组播，容器需要使用 `--network host`；bridge 模式仍可跑 DNS/NetBIOS/mDNS 的单播回退。
@@ -81,11 +82,14 @@ docker run -d \
   -e ROUTER_HOST=192.168.31.1 \
   -e ROUTER_USER=root \
   -e ROUTER_PASSWORD='你的路由器 SSH 密码' \
+  -e ROUTER_WEB_PASSWORD='你的小米后台密码' \
   -e PROXY_GATEWAY=192.168.31.122 \
   -e ROUTER_LEASE_FILE=/tmp/dhcp.leases \
   -v /path/to/data:/data \
   <DOCKERHUB_USERNAME>/router-device-proxy:latest
 ```
+
+`ROUTER_WEB_PASSWORD` 也可以留空，之后在设置页填写；它只用于读取 Xiaomi 设备显示名。
 
 `--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 建议绑定旁路由 LAN IP（例如 `192.168.31.122:18099`），18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
 
@@ -102,6 +106,7 @@ docker run -d \
 | 代理网关 | 旁路由地址，例如 `192.168.31.122` |
 | DHCP leases 路径 | 默认 `/tmp/dhcp.leases`；不同固件可改 |
 | SSH 密码 / SSH 私钥 | 二选一；保存后加密存放在数据卷，不需要每次输入 |
+| 小米后台密码 | 可选；用于读取 Xiaomi 后台显示名（如 `Redmi-K50`），保存后加密存放 |
 
 点 **测试连接** 验证 SSH，点 **安装开机持久化** 在路由器上写入 `/data/dnsmasq.d/restore.sh` 并挂到防火墙 include，重启后自动恢复。
 
@@ -116,6 +121,7 @@ docker run -d \
 | `ROUTER_USER` | `root` | SSH 用户 |
 | `ROUTER_PASSWORD` | 空 | SSH 密码（也可在设置页保存） |
 | `ROUTER_KEY` | 空 | SSH 私钥内容（也可在设置页保存） |
+| `ROUTER_WEB_PASSWORD` | 空 | 小米后台密码，用于读取 Xiaomi 设备显示名（也可在设置页保存） |
 | `ROUTER_LEASE_FILE` | `/tmp/dhcp.leases` | dnsmasq 租约文件路径 |
 | `PROXY_GATEWAY` | `192.168.31.122` | 旁路由网关 |
 | `ROUTER_CONF_DIR` | `/data/dnsmasq.d` | 路由器持久配置目录 |
@@ -173,7 +179,8 @@ go build -trimpath -ldflags="-s -w" -o rdp .
 - DHCP 下发需要设备重连/续租后生效
 - 目前只处理 IPv4；IPv6 分流未实现
 - 开机持久化 hook 面向 OpenWrt/dnsmasq；其他系统需自行适配
-- 名称补全依赖设备是否响应 DNS/NetBIOS/mDNS/SSDP；小米私有设备名（xqDb）不在通用协议内
+- 名称补全依赖设备是否响应 DNS/NetBIOS/mDNS/SSDP；小米私有设备名可通过可选的小米后台密码读取
+- 小米名称适配依赖本地后台登录接口，固件升级可能变化；未配置时回退到通用协议
 - 品牌识别依赖 OUI 库，未知设备显示 `未知设备`
 
 ## License

@@ -72,7 +72,13 @@ func (c *nameCache) put(ip string, h nameHit) {
 // enrichDevices adds names found by DNS/NetBIOS/mDNS/LLMNR/SSDP for devices
 // whose DHCP lease or ARP entry has no hostname. A DHCP name always wins.
 func (a *App) enrichDevices(ctx context.Context, devices []Device) []Device {
-	if !a.cfg.Discovery || a.cfg.Mock || a.names == nil {
+	if a.cfg.Mock {
+		return devices
+	}
+	if xc := a.xiaomiClient(); xc != nil && xc.configured() {
+		devices = a.applyXiaomiNames(ctx, devices, xc)
+	}
+	if !a.cfg.Discovery || a.names == nil {
 		return devices
 	}
 
