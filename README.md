@@ -75,7 +75,7 @@ docker run -d \
   --name router-device-proxy \
   --restart always \
   --network host \
-  -e ADDR=:18099 \
+  -e ADDR=192.168.31.122:18099 \
   -e TZ=Asia/Shanghai \
   -e ADMIN_PASSWORD="$(cat /path/to/admin-password.txt)" \
   -e ROUTER_HOST=192.168.31.1 \
@@ -87,7 +87,7 @@ docker run -d \
   <DOCKERHUB_USERNAME>/router-device-proxy:latest
 ```
 
-`--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 就是宿主机监听端口，18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
+`--network host` 是 SSDP/UPnP 发现所需要的；`ADDR` 建议绑定旁路由 LAN IP（例如 `192.168.31.122:18099`），18099 被占用时换成其他空闲端口。如果容器跑在旁路由上，再加 `--hostname <旁路由主机名>`，旁路由自己也会显示名称。
 
 如果只能用 bridge 网络，把 `--network host` 换成 `-p 18099:8090` 并去掉 `ADDR`；DNS/NetBIOS/mDNS 仍可用，SSDP 不会工作。
 
