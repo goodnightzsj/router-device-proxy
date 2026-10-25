@@ -7,6 +7,7 @@ const state = {
   search: "",
   pending: new Set(),
   config: null,
+  capabilities: {},
   auth: false,
 };
 
@@ -86,6 +87,7 @@ function renderStatus(s) {
   if (s.gateway) parts.push("代理网关 " + s.gateway);
   if (s.mock) parts.push("Mock 模式");
   $("#router-line").textContent = parts.join(" · ") || "—";
+  state.capabilities = s.capabilities || {};
 
   const pill = $("#router-status");
   pill.classList.remove("ok", "bad");
@@ -170,7 +172,8 @@ function updateApply() {
   const n = state.pending.size;
   const btn = $("#apply-btn");
   const badge = $("#pending-count");
-  btn.disabled = n === 0;
+  btn.disabled = n === 0 || state.capabilities.policy === false;
+  btn.title = state.capabilities.policy === false ? "当前路由器适配器不支持下发策略" : "";
   badge.textContent = n;
   badge.classList.toggle("hidden", n === 0);
 }
@@ -247,7 +250,7 @@ function renderBrandSettings(settings, hasSecrets, options) {
         <label class="check"><input type="checkbox" data-clear-secret="${escapeHTML(s.key)}"> 清除已保存的${escapeHTML(s.label)}</label>`;
     }
     return `<label class="field"><span>${escapeHTML(s.label)}</span>
-      <input id="${id}" data-brand-option="${escapeHTML(s.key)}" value="${escapeHTML(options[s.key] || "")}" placeholder="${escapeHTML(s.placeholder || "")}"></label>`;
+      <input id="${id}" data-brand-option="${escapeHTML(s.key)}" value="${escapeHTML(options[s.key] || s.default || "")}" placeholder="${escapeHTML(s.placeholder || "")}"></label>`;
   }).join("");
 }
 
@@ -278,6 +281,7 @@ async function openSettings() {
     $("#cfg-password").value = "";
     $("#cfg-key").value = "";
     renderBrandSettings(cfg.settings || [], cfg.has_secrets || {}, cfg.options || {});
+    $("#hook-btn").disabled = cfg.capabilities ? !cfg.capabilities.persistence : false;
     setAuthMethod(cfg.auth_method || "password");
     $("#settings-output").classList.add("hidden");
     $("#settings-dialog").showModal();

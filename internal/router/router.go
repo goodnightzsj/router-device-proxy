@@ -53,6 +53,7 @@ type Setting struct {
 	Key         string `json:"key"`
 	Label       string `json:"label"`
 	Placeholder string `json:"placeholder,omitempty"`
+	Default     string `json:"default,omitempty"`
 	Secret      bool   `json:"secret,omitempty"`
 }
 

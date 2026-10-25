@@ -231,9 +231,6 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 		cfg.RouterPassword = ""
 	}
 	cfg.Options = copyMap(sc.Options)
-	if cfg.Options["xiaomi_xqdb"] == "" {
-		cfg.Options["xiaomi_xqdb"] = "/data/etc/xqDb"
-	}
 	secrets := map[string]string{}
 	if sc.SecretsEnc != "" {
 		if plain, err := decryptString(sc.SecretsEnc, admin, salt); err == nil && plain != "" {
@@ -242,7 +239,7 @@ func ApplySaved(cfg *Config, sc SavedConfig, admin string) error {
 	}
 	if len(secrets) == 0 && sc.RouterWebPasswordEnc != "" {
 		if v, err := decryptString(sc.RouterWebPasswordEnc, admin, salt); err == nil && v != "" {
-			secrets["legacy_web_password"] = v // legacy migration; brand adapters map it
+			secrets["xiaomi_web_password"] = v // one-time migration from the legacy single-brand field
 		}
 	}
 	cfg.Secrets = secrets

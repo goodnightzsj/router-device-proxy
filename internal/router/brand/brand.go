@@ -2,6 +2,7 @@ package brand
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/goodnightzsj/router-device-proxy/internal/config"
 	"github.com/goodnightzsj/router-device-proxy/internal/router"
@@ -41,23 +42,24 @@ func New(cfg config.Config) (router.Set, error) {
 		Key:         "xiaomi_xqdb",
 		Label:       "小米设备库路径",
 		Placeholder: "/data/etc/xqDb",
+		Default:     "/data/etc/xqDb",
 	}
 	switch cfg.Brand {
 	case "", "auto":
 		set.Brand = "auto"
 		set.Settings = append(set.Settings, xiaomiSetting, xiaomiPath)
-		if path := cfg.Option("xiaomi_xqdb", "/data/etc/xqDb"); path != "" {
+		if path := xqdbPath(cfg); path != "" {
 			set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: path})
 		}
-		if pw := cfg.Secrets["xiaomi_web_password"]; pw != "" {
+		if pw := xiaomiPassword(cfg); pw != "" {
 			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: pw})
 		}
 	case "xiaomi":
 		set.Settings = append(set.Settings, xiaomiSetting, xiaomiPath)
-		if path := cfg.Option("xiaomi_xqdb", "/data/etc/xqDb"); path != "" {
+		if path := xqdbPath(cfg); path != "" {
 			set.Names = append(set.Names, &xiaomi.Xqdb{SSH: sshClient, Path: path})
 		}
-		if pw := cfg.Secrets["xiaomi_web_password"]; pw != "" {
+		if pw := xiaomiPassword(cfg); pw != "" {
 			set.Names = append(set.Names, &xiaomi.WebAPI{Host: cfg.RouterHost, Password: pw})
 		}
 		set.Brand = "xiaomi"
@@ -75,4 +77,21 @@ func New(cfg config.Config) (router.Set, error) {
 		return router.Set{}, fmt.Errorf("unknown router brand %q", cfg.Brand)
 	}
 	return set, nil
+}
+
+func xiaomiPassword(cfg config.Config) string {
+	if v := cfg.Secrets["xiaomi_web_password"]; v != "" {
+		return v
+	}
+	return os.Getenv("ROUTER_WEB_PASSWORD")
+}
+
+func xqdbPath(cfg config.Config) string {
+	if v := cfg.Option("xiaomi_xqdb", ""); v != "" {
+		return v
+	}
+	if v := os.Getenv("XIAOMI_XQDB"); v != "" {
+		return v
+	}
+	return "/data/etc/xqDb"
 }
