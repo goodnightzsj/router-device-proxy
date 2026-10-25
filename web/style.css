@@ -38,6 +38,17 @@ body {
 .hint { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin: 18px 2px 0; }
 .error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 10px 0 0; }
 
+/* ---------- boot ---------- */
+.boot {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+}
+.boot .brand-mark { margin: 0; }
+.boot p { margin: 0; font-size: 13px; }
+
 /* ---------- login ---------- */
 .login-wrap {
   min-height: 100vh;
@@ -275,6 +286,42 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   font-size: 21px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line);
+}
+.device-icon svg { width: 22px; height: 22px; }
+.device-icon.t-phone, .device-icon.t-tablet, .device-icon.t-wearable {
+  color: #c4b5fd;
+  background: rgba(196, 181, 253, 0.08);
+  border-color: rgba(196, 181, 253, 0.18);
+}
+.device-icon.t-camera {
+  color: #fda4af;
+  background: rgba(253, 164, 175, 0.08);
+  border-color: rgba(253, 164, 175, 0.18);
+}
+.device-icon.t-appliance {
+  color: #fcd34d;
+  background: rgba(252, 211, 77, 0.08);
+  border-color: rgba(252, 211, 77, 0.18);
+}
+.device-icon.t-tv, .device-icon.t-speaker {
+  color: #7dd3fc;
+  background: rgba(125, 211, 252, 0.08);
+  border-color: rgba(125, 211, 252, 0.18);
+}
+.device-icon.t-computer, .device-icon.t-server, .device-icon.t-router {
+  color: #93c5fd;
+  background: rgba(147, 197, 253, 0.08);
+  border-color: rgba(147, 197, 253, 0.18);
+}
+.device-icon.t-plug, .device-icon.t-light, .device-icon.t-printer {
+  color: #86efac;
+  background: rgba(134, 239, 172, 0.08);
+  border-color: rgba(134, 239, 172, 0.18);
+}
+.device-icon.t-unknown {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.18);
 }
 .device-title { min-width: 0; flex: 1; }
 .device-title h3 {

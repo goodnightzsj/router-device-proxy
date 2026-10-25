@@ -90,10 +90,10 @@ type SavedConfig struct {
 }
 
 type App struct {
-	cfg    Config
-	store  *Store
-	cfgMu  sync.Mutex
-	saved  SavedConfig
+	cfg   Config
+	store *Store
+	cfgMu sync.Mutex
+	saved SavedConfig
 }
 
 func deriveKey(password string, salt []byte) []byte {
@@ -342,30 +342,14 @@ func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
-	devices, err := a.scanDevices()
-	proxy := 0
-	for _, d := range devices {
-		if d.Mode == "proxy" {
-			proxy++
-		}
-	}
-	ok := a.sshOK()
+	// Status is polled on every page load; keep it to one quick SSH echo so it
+	// does not trigger a second full device scan alongside /api/devices.
 	writeJSON(w, http.StatusOK, map[string]any{
-		"router_ok":    ok,
-		"device_count": len(devices),
-		"proxy_count":  proxy,
-		"gateway":      a.cfg.ProxyGateway,
-		"router_host":  a.cfg.RouterHost,
-		"mock":         a.cfg.Mock,
-		"scan_error":   errString(err),
+		"router_ok":   a.sshOK(),
+		"gateway":     a.cfg.ProxyGateway,
+		"router_host": a.cfg.RouterHost,
+		"mock":        a.cfg.Mock,
 	})
-}
-
-func errString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }
 
 func (a *App) handleDevices(w http.ResponseWriter, r *http.Request) {
@@ -426,15 +410,15 @@ func (a *App) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"router_host":        a.cfg.RouterHost,
-		"router_user":        a.cfg.RouterUser,
-		"auth_method":        authMethod,
-		"has_password":       a.cfg.RouterPassword != "",
-		"has_key":            a.cfg.RouterKey != "",
-		"proxy_gateway":      a.cfg.ProxyGateway,
-		"lease_file":         a.cfg.LeaseFile,
-		"conf_dir":           a.cfg.ConfDir,
-		"tmp_dir":            a.cfg.TmpDir,
+		"router_host":   a.cfg.RouterHost,
+		"router_user":   a.cfg.RouterUser,
+		"auth_method":   authMethod,
+		"has_password":  a.cfg.RouterPassword != "",
+		"has_key":       a.cfg.RouterKey != "",
+		"proxy_gateway": a.cfg.ProxyGateway,
+		"lease_file":    a.cfg.LeaseFile,
+		"conf_dir":      a.cfg.ConfDir,
+		"tmp_dir":       a.cfg.TmpDir,
 	})
 }
 

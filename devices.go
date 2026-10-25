@@ -71,31 +71,49 @@ func containsAny(s string, words ...string) bool {
 func inferType(name, brand string) string {
 	s := strings.ToLower(name + " " + brand)
 	switch {
-	case containsAny(s, "camera", "cam", "ipc", "摄像头"):
+	case containsAny(s, "camera", "cam", "ipc", "doorbell", "nvr", "dvr", "webcam", "摄像头", "监控"):
 		return "camera"
-	case containsAny(s, "washer", "washing", "dryer", "洗衣机", "冰箱", "fridge", "air conditioner", "空调"):
+	case containsAny(s, "washer", "washing", "dryer", "dishwasher", "oven", "vacuum", "robot", "purifier", "humidifier", "heater", "fridge", "air conditioner", "洗衣机", "冰箱", "空调", "净化器", "扫地"):
 		return "appliance"
-	case containsAny(s, "phone", "redmi", "iphone", "pixel", "手机", "galaxy"):
+	case containsAny(s, "printer", "打印"):
+		return "printer"
+	case containsAny(s, "phone", "iphone", "android", "pixel", "galaxy", "oneplus", "oppo", "vivo", "huawei", "honor", "realme", "redmi", "手机"):
 		return "phone"
-	case containsAny(s, "macbook", "laptop", "notebook", "pc", "电脑", "thinkpad"):
+	case containsAny(s, "macbook", "laptop", "notebook", "desktop", "imac", "thinkpad", "电脑", "工作站"):
 		return "computer"
 	case containsAny(s, "ipad", "tablet", "pad"):
 		return "tablet"
-	case containsAny(s, "tv", "电视", "display", "projector"):
+	case containsAny(s, "tv", "电视", "display", "projector", "stb", "appletv", "chromecast", "firetv", "roku"):
 		return "tv"
-	case containsAny(s, "speaker", "音箱", "sound", "homepod", "echo"):
+	case containsAny(s, "speaker", "soundbar", "sonos", "homepod", "echo", "audio", "音箱"):
 		return "speaker"
-	case containsAny(s, "router", "istoreos", "openwrt", "路由"):
+	case containsAny(s, "router", "istoreos", "openwrt", "unifi", "ubnt", "mesh", "gateway", "路由"):
 		return "router"
-	case containsAny(s, "plug", "插座", "switch", "relay"):
+	case containsAny(s, "server", "nas", "synology", "qnap", "proxmox", "esxi", "服务器"):
+		return "server"
+	case containsAny(s, "plug", "socket", "插座", "relay"):
 		return "plug"
-	case containsAny(s, "light", "bulb", "灯"):
+	case containsAny(s, "light", "bulb", "lamp", "灯"):
 		return "light"
-	case containsAny(s, "watch", "手表", "band"):
+	case containsAny(s, "watch", "band", "手表", "手环"):
 		return "wearable"
 	default:
 		return "unknown"
 	}
+}
+
+// isLocallyAdministered reports whether the MAC uses the locally-administered
+// bit, which is what phones and modern OSes set when randomizing their address.
+func isLocallyAdministered(mac string) bool {
+	key := strings.NewReplacer(":", "", "-", "", ".", "").Replace(mac)
+	if len(key) < 2 {
+		return false
+	}
+	b, err := strconv.ParseUint(key[:2], 16, 8)
+	if err != nil {
+		return false
+	}
+	return b&0x02 != 0
 }
 
 func (a *App) scanDevices() ([]Device, error) {
@@ -193,22 +211,31 @@ func (a *App) sshDevices() ([]Device, error) {
 			name = mac
 		}
 		isOnline := exp == 0 || exp > now || online[mac]
-		out = append(out, newDevice(mac, name, ip, isOnline, "lease"))
+		out = append(out, a.finishDevice(newDevice(mac, name, ip, isOnline, "lease")))
 		seen[mac] = true
 	}
 	for mac, ip := range neighIP {
 		if seen[mac] {
 			continue
 		}
-		out = append(out, newDevice(mac, mac, ip, online[mac], "neigh"))
+		out = append(out, a.finishDevice(newDevice(mac, mac, ip, online[mac], "neigh")))
 	}
 	return out, nil
 }
 
+// finishDevice adds facts only the app knows, such as which IP is the proxy
+// gateway. It never overwrites a name or type discovered from the router.
+func (a *App) finishDevice(d Device) Device {
+	if d.IP == a.cfg.ProxyGateway && d.Type == "unknown" {
+		d.Type = "router"
+	}
+	return d
+}
+
 func newDevice(mac, name, ip string, online bool, source string) Device {
 	brand := vendor(mac)
-	if brand == "" {
-		brand = "Unknown"
+	if brand == "" && isLocallyAdministered(mac) {
+		brand = "随机 MAC"
 	}
 	return Device{
 		MAC:    mac,

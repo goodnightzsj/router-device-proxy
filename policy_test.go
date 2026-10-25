@@ -49,15 +49,31 @@ func TestVendor(t *testing.T) {
 
 func TestInferType(t *testing.T) {
 	cases := map[string]string{
-		"chuangmi_camera": "camera",
-		"mibx5-washer":    "appliance",
-		"Redmi-K50":       "phone",
-		"MacBook Pro":     "computer",
-		"Living Room TV":  "tv",
+		"chuangmi_camera":     "camera",
+		"mibx5-washer":        "appliance",
+		"Redmi-K50":           "phone",
+		"MacBook Pro":         "computer",
+		"Living Room TV":      "tv",
+		"HP LaserJet Printer": "printer",
+		"Synology NAS":        "server",
+		"Smart Plug":          "plug",
 	}
 	for name, want := range cases {
 		if got := inferType(name, ""); got != want {
 			t.Errorf("inferType(%q) = %q, want %q", name, got, want)
 		}
+	}
+}
+
+func TestLocallyAdministered(t *testing.T) {
+	if !isLocallyAdministered("0e:f4:ec:d9:83:b7") {
+		t.Fatal("randomized MAC not detected")
+	}
+	if isLocallyAdministered("68:1d:ef:3b:67:31") {
+		t.Fatal("global MAC misdetected as randomized")
+	}
+	d := newDevice("0e:f4:ec:d9:83:b7", "0e:f4:ec:d9:83:b7", "192.168.31.192", true, "lease")
+	if d.Brand != "随机 MAC" {
+		t.Fatalf("randomized MAC brand = %q, want 随机 MAC", d.Brand)
 	}
 }

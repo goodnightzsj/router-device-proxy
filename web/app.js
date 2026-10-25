@@ -10,15 +10,30 @@ const state = {
   auth: false,
 };
 
+const svgIcon = (body) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+
 const ICONS = {
-  phone: "📱", computer: "💻", camera: "📷", appliance: "🧺", tv: "📺",
-  speaker: "🔊", router: "🛰️", plug: "🔌", light: "💡", wearable: "⌚",
-  tablet: "📲", unknown: "❓",
+  phone: svgIcon('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
+  computer: svgIcon('<rect x="4" y="4.5" width="16" height="11" rx="2"/><path d="M2 19h20"/>'),
+  tv: svgIcon('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'),
+  tablet: svgIcon('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/>'),
+  camera: svgIcon('<path d="M3 8.5h3.5L9 5.5h6l2.5 3H21v10H3z"/><circle cx="12" cy="13" r="3.2"/>'),
+  appliance: svgIcon('<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="13.5" r="4"/><path d="M8 6.5h.01M11 6.5h.01"/>'),
+  speaker: svgIcon('<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14.5" r="3"/><circle cx="12" cy="8" r="1"/>'),
+  router: svgIcon('<rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 16.5h.01M11 16.5h.01M12 13V9M8 5.5l2 2M16 5.5l-2 2"/>'),
+  server: svgIcon('<rect x="4" y="3.5" width="16" height="7" rx="1.5"/><rect x="4" y="13.5" width="16" height="7" rx="1.5"/><path d="M8 7h.01M8 17h.01"/>'),
+  plug: svgIcon('<path d="M9 3v5M15 3v5"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>'),
+  light: svgIcon('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0 0 12 3z"/>'),
+  wearable: svgIcon('<rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6V3h6v3M9 18v3h6v-3"/>'),
+  printer: svgIcon('<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>'),
+  unknown: svgIcon('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/>'),
 };
 const TYPE_LABELS = {
   phone: "手机", computer: "电脑", camera: "摄像头", appliance: "家电",
-  tv: "电视", speaker: "音箱", router: "路由器", plug: "插座", light: "灯",
-  wearable: "穿戴", tablet: "平板", unknown: "未知",
+  tv: "电视", speaker: "音箱", router: "路由器", server: "服务器",
+  plug: "插座", light: "灯", wearable: "穿戴", tablet: "平板",
+  printer: "打印机", unknown: "未知设备",
 };
 
 function escapeHTML(s) {
@@ -44,12 +59,14 @@ async function api(path, opts = {}) {
 
 function showLogin() {
   state.auth = false;
+  $("#boot").classList.add("hidden");
   $("#login").classList.remove("hidden");
   $("#app").classList.add("hidden");
 }
 
 function showApp() {
   state.auth = true;
+  $("#boot").classList.add("hidden");
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
 }
@@ -68,7 +85,6 @@ function renderStatus(s) {
   if (s.router_host) parts.push(s.router_host);
   if (s.gateway) parts.push("代理网关 " + s.gateway);
   if (s.mock) parts.push("Mock 模式");
-  if (s.scan_error) parts.push(s.scan_error);
   $("#router-line").textContent = parts.join(" · ") || "—";
 
   const pill = $("#router-status");
@@ -116,14 +132,16 @@ function renderGrid() {
   grid.innerHTML = list.map((d) => {
     const isProxy = d.mode === "proxy";
     const pending = state.pending.has(d.mac);
-    const type = d.type || "unknown";
+    const type = ICONS[d.type] ? d.type : "unknown";
+    const brand = d.brand && d.brand !== "Unknown" ? d.brand : "";
+    const meta = [brand, TYPE_LABELS[type]].filter(Boolean).join(" · ");
     return `
       <article class="device ${isProxy ? "proxy" : ""} ${d.online ? "" : "offline"}">
         <div class="device-head">
-          <div class="device-icon">${ICONS[type] || ICONS.unknown}</div>
+          <div class="device-icon t-${type}">${ICONS[type]}</div>
           <div class="device-title">
             <h3>${escapeHTML(d.name)}</h3>
-            <p>${escapeHTML(d.brand)} · ${TYPE_LABELS[type] || TYPE_LABELS.unknown}</p>
+            <p>${escapeHTML(meta)}</p>
           </div>
         </div>
         <div class="badges">
@@ -337,11 +355,11 @@ $("#hook-btn").addEventListener("click", async () => {
 
 (async function init() {
   try {
-    const status = await api("/api/status");
-    showApp();
-    renderStatus(status);
     await loadAll();
-  } catch (_) {
+    showApp();
+  } catch (err) {
+    if (err.message === "unauthorized") return;
+    $("#login-error").textContent = "无法加载设备：" + err.message;
     showLogin();
   }
 })();
