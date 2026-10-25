@@ -17,7 +17,20 @@
 - 不统一各品牌的私有云接口。
 - 不在本轮实现 IPv6 分流。
 
-## 2. 当前变化轴
+## 3. 当前状态（已落地）
+
+Phase 1–3 已完成：
+
+- `cmd/router-device-proxy` 只做装配，不引用任何品牌包。
+- 核心 `internal/config` / `device` / `discovery` / `policy` / `sshx` / `webui` 不再出现 Xiaomi 专有字段。
+- `internal/router` 定义 `DeviceSource` / `NameSource` / `PolicyApplier` / `PersistenceInstaller` / `Health` / `Setting`。
+- `internal/router/brand` 是唯一的品牌注册表；`openwrt`、`generic`、`xiaomi` 是适配器。
+- 设置页由 `router.Setting` 元数据驱动，核心不再硬编码“小米后台密码”。
+- `ROUTER_BRAND=auto|openwrt|generic|xiaomi`；`auto` 默认挂载 Xiaomi 名称源。
+
+Phase 4（用第二个真实品牌验证接口）待做。
+
+## 4. 当前变化轴
 
 | 变化轴 | 当前实现 | 其他品牌可能不同 |
 |---|---|---|
