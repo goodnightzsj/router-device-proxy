@@ -118,6 +118,14 @@ function deviceTitle(d) {
   return d.note || d.name;
 }
 
+// Collapse common legal suffixes so long OUI names do not dominate the card.
+function shortVendor(v) {
+  return String(v || "")
+    .replace(/\s+(Technology|Technologies|Electronics|Communication|Communications)\s+(Co\.?,?\s*Ltd\.?|Corporation|Corp\.?|Inc\.?|Limited|L\.?L\.?C\.?)$/i, "")
+    .replace(/\s+(Co\.?,?\s*Ltd\.?|Corporation|Corp\.?|Inc\.?|Limited|L\.?L\.?C\.?)$/i, "")
+    .trim();
+}
+
 function renderGrid() {
   const grid = $("#device-grid");
   const q = state.search.trim().toLowerCase();
@@ -143,7 +151,8 @@ function renderGrid() {
     const pending = state.pending.has(d.mac);
     const type = ICONS[d.type] ? d.type : "unknown";
     const brand = d.brand && d.brand !== "Unknown" ? d.brand : "";
-    const meta = [brand, TYPE_LABELS[type]].filter(Boolean).join(" · ");
+    const vendor = shortVendor(brand);
+    const typeLabel = TYPE_LABELS[type] || TYPE_LABELS.unknown;
     const title = deviceTitle(d);
     return `
       <article class="device ${isProxy ? "proxy" : ""} ${d.online ? "" : "offline"}">
@@ -151,7 +160,10 @@ function renderGrid() {
           <div class="device-icon t-${type}">${ICONS[type]}</div>
           <div class="device-title">
             <h3>${escapeHTML(title)}${d.note ? ' <span class="note-mark">备注</span>' : ""}</h3>
-            <p>${escapeHTML(meta)}</p>
+            <p class="device-sub">
+              <span class="type-chip t-${type}">${escapeHTML(typeLabel)}</span>
+              ${vendor ? `<span class="brand-text" title="${escapeHTML(brand)}">${escapeHTML(vendor)}</span>` : ""}
+            </p>
             ${d.note && d.name && d.note !== d.name ? `<p class="device-original">原名称：${escapeHTML(d.name)}</p>` : ""}
           </div>
           <button class="edit-note" data-note-mac="${escapeHTML(d.mac)}" title="修改备注" aria-label="修改备注">✎</button>

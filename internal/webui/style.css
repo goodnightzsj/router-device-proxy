@@ -376,7 +376,37 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.device-title p { margin: 3px 0 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 4px 0 0;
+}
+.type-chip {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+.type-chip.t-phone, .type-chip.t-tablet, .type-chip.t-wearable { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.22); background: rgba(196, 181, 253, 0.07); }
+.type-chip.t-camera { color: #fda4af; border-color: rgba(253, 164, 175, 0.22); background: rgba(253, 164, 175, 0.07); }
+.type-chip.t-appliance { color: #fcd34d; border-color: rgba(252, 211, 77, 0.22); background: rgba(252, 211, 77, 0.07); }
+.type-chip.t-tv, .type-chip.t-speaker { color: #7dd3fc; border-color: rgba(125, 211, 252, 0.22); background: rgba(125, 211, 252, 0.07); }
+.type-chip.t-computer, .type-chip.t-server, .type-chip.t-router { color: #93c5fd; border-color: rgba(147, 197, 253, 0.22); background: rgba(147, 197, 253, 0.07); }
+.type-chip.t-plug, .type-chip.t-light, .type-chip.t-printer { color: #86efac; border-color: rgba(134, 239, 172, 0.22); background: rgba(134, 239, 172, 0.07); }
+.brand-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--muted);
+}
 
 .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .tag {
