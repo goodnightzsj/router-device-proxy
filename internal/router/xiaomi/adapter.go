@@ -27,18 +27,23 @@ func Settings() []router.Setting {
 	}
 }
 
+// XqdbPath resolves the configured database path.
+func XqdbPath(options map[string]string) string {
+	if v := options["xiaomi_xqdb"]; v != "" {
+		return v
+	}
+	if v := os.Getenv("XIAOMI_XQDB"); v != "" {
+		return v
+	}
+	return "/data/etc/xqDb"
+}
+
 // NewNames builds the Xiaomi name sources. xqDb needs only SSH; the web API
 // is added when a password is available. Set xiaomi_xqdb=off to skip xqDb.
 func NewNames(ssh *sshx.Client, host string, secrets, options map[string]string) []router.NameSource {
 	var out []router.NameSource
-	path := options["xiaomi_xqdb"]
-	if path == "" {
-		path = os.Getenv("XIAOMI_XQDB")
-	}
-	if path == "" {
-		path = "/data/etc/xqDb"
-	}
-	if path != "off" {
+	path := XqdbPath(options)
+	if path != "" && path != "off" {
 		out = append(out, &Xqdb{SSH: ssh, Path: path})
 	}
 	password := secrets["xiaomi_web_password"]

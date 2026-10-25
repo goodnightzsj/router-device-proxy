@@ -2,6 +2,7 @@ package brand
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/goodnightzsj/router-device-proxy/internal/config"
 	"github.com/goodnightzsj/router-device-proxy/internal/router"
@@ -35,7 +36,13 @@ func New(cfg config.Config) (router.Set, error) {
 	switch cfg.Brand {
 	case "", "auto":
 		set.Brand = "auto"
-		set.Settings = append(set.Settings, xiaomi.Settings()...)
+		hasSecret := cfg.Secrets["xiaomi_web_password"] != "" || cfg.Secrets["legacy_web_password"] != ""
+		explicit := cfg.Options["xiaomi_xqdb"] != "" || os.Getenv("XIAOMI_XQDB") != ""
+		if hasSecret || explicit {
+			set.Settings = append(set.Settings, xiaomi.Settings()...)
+		}
+		// Names are always mounted so a transient probe failure does not
+		// disable xqDb; unsupported routers fail this read gracefully.
 		set.Names = append(set.Names, xiaomi.NewNames(sshClient, cfg.RouterHost, cfg.Secrets, cfg.Options)...)
 	case "xiaomi":
 		set.Settings = append(set.Settings, xiaomi.Settings()...)
